@@ -93,13 +93,4 @@ class CrystalSite:
         dist = np.sqrt(np.sum(np.square(site1.position - site2.position)))
         return dist
 
-    @staticmethod
-    def test_read_write():
-        line_list = "SM1   4    0.086935    0.000000    0.881310    10.50000    0.00558".split()
-        cs = CrystalSite(line_list)
-        print cs.write_line()
-
-
-if __name__ == "__main__":
-    CrystalSite.test_read_write()
 
