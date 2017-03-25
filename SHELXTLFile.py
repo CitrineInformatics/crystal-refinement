@@ -1,4 +1,5 @@
 import re
+from CrystalSite import CrystalSite
 
 # Parser for .ins and .res SHELLXTL files
 class SHELXTLFile():
@@ -86,7 +87,7 @@ class SHELXTLFile():
                 line_idx += 1
             else:
                 crystal_info = line.split()
-            self.crystal_sites.append(crystal_info)
+            self.crystal_sites.append(CrystalSite(crystal_info))
             line_idx += 1
 
         # End text section
@@ -111,7 +112,7 @@ class SHELXTLFile():
         res += "\n".join(self.commands) + "\n"
         res += "\n".join(key + " " + " ".join(values) for key, values in self.named_params.items()) + "\n"
         res += "FVAR " + " ".join(self.fvar_vals) + "\n"
-        res += "\n".join([" ".join(site_info) for site_info in self.crystal_sites]) + "\n"
+        res += "\n".join([" ".join(cs.write_line()) for cs in self.crystal_sites]) + "\n"
         res += self.extra_text[2]
         return res
 
@@ -119,13 +120,14 @@ class SHELXTLFile():
     # various editing methods ...
 
 def main():
-    test_file = "/Users/eantono/Documents/project_files/xtal_refinement/example/4.ins"
+    test_file = "/Users/julialing/Documents/DataScience/crystal_refinement/4-2-1-4_single_crystal/Example_from_slides/7.ins"
 
     with open(test_file) as f:
         text = f.read()
         print text
         print "\n\n" + "~"*50 + "\n\n"
         file_obj = SHELXTLFile(text)
+
         print file_obj.write_ins()
 
 
