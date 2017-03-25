@@ -11,9 +11,8 @@ class SHELXTLFile():
         self.elements = []
         self.formula_units = []
 
-        # object to store "commands"?
-        self.commands = []
-        self.named_params = {}
+        # Stores commands as dict.  If command has no value, value is set to None
+        self.commands = {}
 
         self.fvar_vals = []
 
@@ -65,16 +64,17 @@ class SHELXTLFile():
 
             if re.match("^\s*$", line) is None:
                 split = line.split()
+                key = split[0]
                 if len(split) == 1:
-                    self.commands.append(split[0])
+                    self.commands[key] = None
+
                 else:
-                    key = split[0]
                     if key == "FVAR":
                         self.fvar_vals = split[1:]
                     elif key in starting_element_keys:
                         break
                     else:
-                        self.named_params[key] = split[1:]
+                        self.commands[key] = split[1:]
             line_idx += 1
 
         # Crystal site section
@@ -108,9 +108,12 @@ class SHELXTLFile():
         res = self.extra_text[0]
         res += "SFAC " + " ".join(self.elements) + "\n"
         res += "UNIT " + " ".join(self.formula_units) + "\n"
-        res += self.extra_text[1] + "\n"
-        res += "\n".join(self.commands) + "\n"
-        res += "\n".join(key + " " + " ".join(values) for key, values in self.named_params.items()) + "\n"
+        res += self.extra_text[1] + "\n \n"
+        for key in self.commands.keys():
+            res += key + "  "
+            if self.commands[key] is not None:
+                res += " ".join(self.commands[key])
+            res += "\n"
         res += "FVAR " + " ".join(self.fvar_vals) + "\n"
         res += "\n".join([" ".join(cs.write_line()) for cs in self.crystal_sites]) + "\n"
         res += self.extra_text[2]
