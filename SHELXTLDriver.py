@@ -54,7 +54,8 @@ def main():
     os.chdir(ins_path)
     driver = SHELXTLDriver(ins_path=ins_path, prefix=prefix, path_to_SXTL_dir=path_to_SXTL_dir, is_macOS=True)
     file_obj = driver.get_ins_file()
-    file_obj.commands["ANIS"] = None
+    file_obj.add_anisotropy()
+    file_obj.change_element(1, 1)
     driver.run_SHELXTL(file_obj).write_ins()
 
 
