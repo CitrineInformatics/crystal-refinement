@@ -80,6 +80,8 @@ class SHELXTLFile():
         # Crystal site section
         while True:
             line = lines[line_idx]
+            if len(line.split()) == 0:
+                break
             if "HKLF" in line:
                 break
             if "=" in line:
