@@ -123,6 +123,29 @@ class SHELXTLFile():
 
 
     # various editing methods ...
+    def add_anisotropy(self):
+        cmd = "ANIS"
+        if cmd not in self.commands:
+            self.commands[cmd] = None
+
+    def remove_anisotropy(self):
+        cmd = "ANIS"
+        if cmd in self.commands:
+            del self.commands[cmd]
+
+    def add_exti(self):
+        cmd = "EXTI"
+        if cmd not in self.commands:
+            self.commands[cmd] = None
+
+    def remove_exti(self):
+        cmd = "EXTI"
+        if cmd in self.commands:
+            del self.commands[cmd]
+
+    def change_element(self, site_index, element_index):
+        self.crystal_sites[site_index].element = element_index
+
 
 def main():
     test_file = "/Users/julialing/Documents/DataScience/crystal_refinement/4-2-1-4_single_crystal/Example_from_slides/7.ins"
