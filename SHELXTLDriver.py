@@ -5,16 +5,17 @@ from SHELXTLFile import SHELXTLFile
 # interface that takes and returns SHELXTLFile objects and does SHELXTL things
 
 class SHELXTLDriver():
-    def __init__(self, original_file_prefix, path_to_SXTL_dir, is_macOS=True):
+    def __init__(self, ins_path, prefix, path_to_SXTL_dir, is_macOS=True):
         self.is_macOS = is_macOS
         self.path_to_SXTL_dir = path_to_SXTL_dir
-        self.directory = tempfile.mkdtemp()
+        self.directory = ins_path
+        #self.directory = tempfile.mkdtemp()
         self.file_prefix = os.path.join(self.directory + "temp")
         self.hkl_file = self.file_prefix + ".hkl"
         self.ins_file = self.file_prefix + ".ins"
         self.res_file = self.file_prefix + ".res"
-        shutil.copy(original_file_prefix + ".hkl", self.hkl_file)
-        shutil.copy(original_file_prefix + ".ins", self.ins_file)
+        shutil.copy(ins_path + prefix + ".hkl", self.hkl_file)
+        shutil.copy(ins_path + prefix + ".ins", self.ins_file)
         # we may want some special 1st iteration code here that operates on the first round of iteration
         # after XPREP (removing non-atom Q peaks, removing the MOLE lines etc.)
         # self.run_SHELXTL_command()
@@ -45,12 +46,16 @@ class SHELXTLDriver():
 
 
 def main():
-    path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL"
-    test_path = "/Users/eantono/Documents/project_files/xtal_refinement/example/temp"
-    driver = SHELXTLDriver(test_path, path_to_SXTL_dir, True)
+    # path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL"
+    # test_path = "/Users/eantono/Documents/project_files/xtal_refinement/example/temp"
+    path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal-refinement/shelxtl/SXTL/"
+    ins_path="/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
+    prefix = "orig"
+    os.chdir(ins_path)
+    driver = SHELXTLDriver(ins_path=ins_path, prefix=prefix, path_to_SXTL_dir=path_to_SXTL_dir, is_macOS=True)
     file_obj = driver.get_ins_file()
-    file_obj.commands.append("ANIS")
-    print driver.run_SHELXTL(file_obj).write_ins()
+    file_obj.commands["ANIS"] = None
+    driver.run_SHELXTL(file_obj).write_ins()
 
 
 if __name__ == "__main__":
