@@ -37,8 +37,8 @@ class SHELXTLDriver():
         self.run_SHELXTL_command()
         return self.get_res_file()
 
-    def run_SHELXTL_command(self):
-        command_args = [os.path.join(self.path_to_SXTL_dir, "xl.exe"), self.file_prefix]
+    def run_SHELXTL_command(self, cmd="xl.exe"):
+        command_args = [os.path.join(self.path_to_SXTL_dir, cmd), self.file_prefix]
         if self.is_macOS:
             command_args = ["wine"] + command_args
         subprocess.call(command_args)

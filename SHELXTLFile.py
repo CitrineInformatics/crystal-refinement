@@ -71,6 +71,9 @@ class SHELXTLFile():
                 else:
                     if key == "FVAR":
                         self.fvar_vals = split[1:]
+                    elif key == "MOLE":
+                        break
+
                     elif key in starting_element_keys:
                         break
                     else:
@@ -84,12 +87,18 @@ class SHELXTLFile():
                 break
             if "HKLF" in line:
                 break
+            if "MOLE" in line:
+                line_idx += 1
+                continue
             if "=" in line:
                 crystal_info = line.split()[:-1] + lines[line_idx + 1].split()
                 line_idx += 1
             else:
                 crystal_info = line.split()
-            self.crystal_sites.append(CrystalSite(crystal_info))
+            if crystal_info[0][0] == "Q":
+                self.q_peaks.append(CrystalSite(crystal_info))
+            else:
+                self.crystal_sites.append(CrystalSite(crystal_info))
             line_idx += 1
 
         # End text section

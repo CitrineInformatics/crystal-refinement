@@ -9,11 +9,15 @@ class Optimizer():
         self.ins_history = []
         self.r1_history = []
 
-    def run(self, path_to_SXTL_dir, ins_path, prefix):
+    def run(self, path_to_SXTL_dir, ins_path, input_prefix, output_prefix):
         os.chdir(ins_path)
-        shutil.copy(ins_path + prefix + ".hkl", ins_path + "temp.hkl")
-        shutil.copy(ins_path + prefix + ".ins", ins_path + "temp.ins")
-        driver = SHELXTLDriver(ins_path=ins_path, prefix="temp", path_to_SXTL_dir=path_to_SXTL_dir, is_macOS=True)
+        shutil.copy(ins_path + input_prefix + ".hkl", ins_path + output_prefix + ".hkl")
+        shutil.copy(ins_path + input_prefix + ".ins", ins_path + output_prefix + ".ins")
+        driver = SHELXTLDriver(ins_path=ins_path, prefix=output_prefix, path_to_SXTL_dir=path_to_SXTL_dir, is_macOS=True)
+
+        # Run first iteration
+        driver.run_SHELXTL_command(cmd="xs")
+        shutil.copy(ins_path + output_prefix + ".res", ins_path + output_prefix + ".ins")
 
         # Read in and run initial SHELXTL file
         ins_file = driver.get_ins_file()
@@ -23,9 +27,8 @@ class Optimizer():
         self.r1_history.append(res.r1)
         self.switch_elements(driver)
         self.try_add_q(driver)
-        self.try_anisotropy(driver)
         self.try_exti(driver)
-
+        self.try_anisotropy(driver)
 
     def is_converged(self, count, max_iter=100):
         converged = False
@@ -157,12 +160,16 @@ class Optimizer():
     def change_occupancy(self):
         pass
 
+    def change_occupancy_prefix(self):
+        pass
+
 def main():
     path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal-refinement/shelxtl/SXTL/"
     ins_path = "/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
-    prefix = "orig"
+    input_prefix = "1"
+    output_prefix = "temp"
     opt = Optimizer()
-    opt.run(path_to_SXTL_dir, ins_path, prefix)
+    opt.run(path_to_SXTL_dir, ins_path, input_prefix, output_prefix)
     print opt.r1_history
 
 
