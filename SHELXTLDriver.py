@@ -11,11 +11,10 @@ class SHELXTLDriver():
         self.directory = ins_path
         #self.directory = tempfile.mkdtemp()
         self.file_prefix = os.path.join(self.directory + "temp")
-        self.hkl_file = self.file_prefix + ".hkl"
-        self.ins_file = self.file_prefix + ".ins"
-        self.res_file = self.file_prefix + ".res"
-        shutil.copy(ins_path + prefix + ".hkl", self.hkl_file)
-        shutil.copy(ins_path + prefix + ".ins", self.ins_file)
+        self.hkl_file = self.directory + prefix + ".hkl"
+        self.ins_file = self.directory + prefix + ".ins"
+        self.res_file = self.directory + prefix + ".res"
+
         # we may want some special 1st iteration code here that operates on the first round of iteration
         # after XPREP (removing non-atom Q peaks, removing the MOLE lines etc.)
         # self.run_SHELXTL_command()
