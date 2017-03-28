@@ -119,6 +119,8 @@ class SHELXTLFile():
         res += "FVAR " + " ".join(self.fvar_vals) + "\n"
         res += "\n".join([" ".join(cs.write_line()) for cs in self.crystal_sites]) + "\n"
         res += self.extra_text[2]
+
+
         return res
 
 
@@ -146,6 +148,16 @@ class SHELXTLFile():
     def change_element(self, site_index, element_index):
         self.crystal_sites[site_index].element = element_index
         self.crystal_sites[site_index].name = self.elements[element_index-1] + str(site_index+1)
+
+    def move_q_to_crystal(self):
+        self.crystal_sites.append(self.q_peaks[0])
+        del self.q_peaks[0]
+
+    def move_crystal_to_q(self):
+        self.q_peaks.append(self.crystal_sites[-1])
+        del self.crystal_sites[-1]
+
+
 
 
 def main():
