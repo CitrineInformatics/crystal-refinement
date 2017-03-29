@@ -25,8 +25,9 @@ class Optimizer():
         res = driver.run_SHELXTL(ins_file)
         res.write_ins()
         self.r1_history.append(res.r1)
-        self.switch_elements(driver)
         self.try_add_q(driver)
+        self.try_remove_site(driver)
+        self.switch_elements(driver)
         self.try_exti(driver)
         self.try_anisotropy(driver)
 
@@ -57,9 +58,6 @@ class Optimizer():
         res.write_ins()
         self.r1_history.append(res.r1)
 
-
-
-
     def try_anisotropy(self, driver):
         """
         Test if adding anisotropy reduces R1 value.  If it does, do so.
@@ -89,8 +87,6 @@ class Optimizer():
             res = driver.run_SHELXTL(ins_file)
             res.write_ins()
             self.r1_history.append(res.r1)
-
-
 
     def try_exti(self, driver):
         """
@@ -128,34 +124,65 @@ class Optimizer():
         :param driver:
         :return:
         """
+
         r_before = self.r1_history[-1]
         ins_file = driver.get_res_file()
-        ins_file.move_q_to_crystal()
-        num_elems = len(ins_file.elements)
-        for elem in range(1, num_elems + 1):
-            ins_file.change_element(len(ins_file.crystal_sites)-1, elem)
+        threshold_distance = 2.0  # No sites allowed within 2 Angstroms of other sites
+        if ins_file.q_peaks[0].calc_min_distance_to_others(ins_file.crystal_sites) > threshold_distance:
+            ins_file.move_q_to_crystal()
+            num_elems = len(ins_file.elements)
+            for elem in range(1, num_elems + 1):
+                ins_file.change_element(len(ins_file.crystal_sites)-1, elem)
+                self.ins_history.append(ins_file)
+                res = driver.run_SHELXTL(ins_file)
+                res.write_ins()
+                self.r1_history.append(res.r1)
+            best_elem = np.argmin(self.r1_history[-num_elems:]) + 1
+            ins_file.change_element(len(ins_file.crystal_sites)-1, best_elem)
             self.ins_history.append(ins_file)
             res = driver.run_SHELXTL(ins_file)
             res.write_ins()
             self.r1_history.append(res.r1)
-        best_elem = np.argmin(self.r1_history[-num_elems:]) + 1
-        ins_file.change_element(len(ins_file.crystal_sites)-1, best_elem)
-        self.ins_history.append(ins_file)
-        res = driver.run_SHELXTL(ins_file)
-        res.write_ins()
-        self.r1_history.append(res.r1)
 
-        #   If adding one peak helped, recursively try adding another peak until it stops helping
-        if res.r1 < r_before:
-            self.try_add_q(driver)
+            #   If adding one peak helped, recursively try adding another peak until it stops helping
+            if res.r1 < r_before:
+                self.try_add_q(driver)
 
-        #  If adding peak didn't help, take it back off
-        else:
-            ins_file.move_crystal_to_q()
-            self.ins_history.append(ins_file)
-            res = driver.run_SHELXTL(ins_file)
-            res.write_ins()
-            self.r1_history.append(res.r1)
+            #  If adding peak didn't help, take it back off
+            else:
+                ins_file.move_crystal_to_q()
+                self.ins_history.append(ins_file)
+                res = driver.run_SHELXTL(ins_file)
+                res.write_ins()
+                self.r1_history.append(res.r1)
+
+    def try_remove_site(self, driver):
+        """
+        Try adding q peaks to main crystal sites if it decreases R value
+        :param driver:
+        :return:
+        """
+        ins_file = driver.get_ins_file()
+        threshold_distance = 2.0  # No sites allowed within 2 Angstroms of other sites
+        for i, site in reversed(list(enumerate(ins_file.crystal_sites))):
+            if site.calc_min_distance_to_others(ins_file.crystal_sites) < threshold_distance:
+                r_before = self.r1_history[-1]
+                del ins_file.crystal_sites[i]
+                self.ins_history.append(ins_file)
+                res = driver.run_SHELXTL(ins_file)
+                self.r1_history.append(res.r1)
+
+                #  If removing peak didn't help, add it back on
+                if res.r1 > r_before:
+                    ins_file.crystal_sites.insert(i, site)
+                    self.ins_history.append(ins_file)
+                    res = driver.run_SHELXTL(ins_file)
+
+                    self.r1_history.append(res.r1)
+                res.write_ins()
+
+
+
 
     def change_occupancy(self):
         pass
@@ -166,7 +193,7 @@ class Optimizer():
 def main():
     path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal-refinement/shelxtl/SXTL/"
     ins_path = "/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
-    input_prefix = "1"
+    input_prefix = "absfac1"
     output_prefix = "temp"
     opt = Optimizer()
     opt.run(path_to_SXTL_dir, ins_path, input_prefix, output_prefix)
