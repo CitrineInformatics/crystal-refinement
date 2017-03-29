@@ -1,6 +1,8 @@
 import numpy as np
 
 
+#  TODO: CURRENT DISTANCE CALCULATION IS WRONG
+
 class CrystalSite:
     def __init__(self, line_list):
         self.name = None
