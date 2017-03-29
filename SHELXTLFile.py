@@ -58,7 +58,7 @@ class SHELXTLFile():
         line_idx += 1
 
         # Command/parameter section break on starting element key
-        starting_element_keys = ["{}1".format(el) for el in self.elements]
+        starting_element_keys = ["{}".format(el) for el in self.elements]
         while True:
             line = lines[line_idx]
 
@@ -74,7 +74,7 @@ class SHELXTLFile():
                     elif key == "MOLE":
                         break
 
-                    elif key in starting_element_keys:
+                    elif key[:-1] in starting_element_keys:
                         break
                     else:
                         self.commands[key] = split[1:]
@@ -162,9 +162,9 @@ class SHELXTLFile():
         self.crystal_sites.append(self.q_peaks[0])
         del self.q_peaks[0]
 
-    def move_crystal_to_q(self):
-        self.q_peaks.append(self.crystal_sites[-1])
-        del self.crystal_sites[-1]
+    def move_crystal_to_q(self, site_idx=-1):
+        self.q_peaks.insert(0, self.crystal_sites[site_idx])
+        del self.crystal_sites[site_idx]
 
 
 
