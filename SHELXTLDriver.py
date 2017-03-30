@@ -34,7 +34,7 @@ class SHELXTLDriver():
     # takes .ins file and returns resulting .res file
     def run_SHELXTL(self, ins_file_obj):
         with open(self.ins_file, 'w') as f:
-            f.write(ins_file_obj.write_ins())
+            f.write(ins_file_obj.get_ins_text())
         self.run_SHELXTL_command()
         return self.get_res_file()
 

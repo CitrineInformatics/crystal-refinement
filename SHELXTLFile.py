@@ -5,6 +5,7 @@ from CrystalSite import CrystalSite
 class SHELXTLFile():
     def __init__(self, filetxt):
         # Text that will not be modified, which just needs to be stored in order to re-write the file
+        self.filetxt = filetxt
         self.extra_text = ["", "", ""]
         self.extra_text_section = 0
 
@@ -65,15 +66,13 @@ class SHELXTLFile():
             if re.match("^\s*$", line) is None:
                 split = line.split()
                 key = split[0]
-                if len(split) == 1:
+                if key == "FVAR":
+                    self.fvar_vals = split[1:]
+                elif len(split) == 1:
                     self.commands[key] = None
-
                 else:
-                    if key == "FVAR":
-                        self.fvar_vals = split[1:]
-                    elif key == "MOLE":
+                    if key == "MOLE":
                         break
-
                     elif key[:-1] in starting_element_keys:
                         break
                     else:
@@ -115,7 +114,7 @@ class SHELXTLFile():
 
 
     # write ins file (with commands?)
-    def write_ins(self):
+    def get_ins_text(self):
         res = self.extra_text[0]
         res += "SFAC " + " ".join(self.elements) + "\n"
         res += "UNIT " + " ".join(self.formula_units) + "\n"

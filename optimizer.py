@@ -25,16 +25,28 @@ class Optimizer():
 
         # Read in and run initial SHELXTL file
         ins_file = driver.get_ins_file()
-        self.ins_history.append(ins_file)
-        res = driver.run_SHELXTL(ins_file)
-        res.write_ins()
-        self.r1_history.append(res.r1)
+        self.run_iter(driver, ins_file)
+
+        # Optimization
         self.try_add_q(driver)
         self.try_remove_site(driver)
         self.switch_elements(driver)
+        # self.change_occupancy(driver)
+        self.try_split_occupancy(driver)
+        self.try_exti(driver)
+        self.try_anisotropy(driver)
 
-        # self.try_exti(driver)
-        # self.try_anisotropy(driver)
+    def run_iter(self, driver, ins_file):
+        """
+        Run the given ins file through SHELXTL and record the file and resulting r1
+        :param driver:
+        :param ins_file:
+        :return:
+        """
+        self.ins_history.append(copy.copy(ins_file))
+        res = driver.run_SHELXTL(ins_file)
+        self.r1_history.append(res.r1)
+        return res
 
     def is_converged(self, count, max_iter=100):
         converged = False
@@ -52,16 +64,10 @@ class Optimizer():
         for i in order:
             for elem in range(1, num_elems+1):
                 ins_file.change_element(i, elem)
-                self.ins_history.append(ins_file)
-                res = driver.run_SHELXTL(ins_file)
-                res.write_ins()
-                self.r1_history.append(res.r1)
+                self.run_iter(driver, ins_file)
             best_elem = np.argmin(self.r1_history[-num_elems:]) + 1
             ins_file.change_element(i, best_elem)
-        self.ins_history.append(ins_file)
-        res = driver.run_SHELXTL(ins_file)
-        res.write_ins()
-        self.r1_history.append(res.r1)
+        self.run_iter(driver, ins_file)
 
     def try_anisotropy(self, driver):
         """
@@ -70,28 +76,16 @@ class Optimizer():
         :return:
         """
 
+        prev_ins = copy.copy(driver.get_res_file())
+
         #  Try with anisotropy
-        ins_file = driver.get_ins_file()
+        ins_file = driver.get_res_file()
         ins_file.add_anisotropy()
-        self.ins_history.append(ins_file)
-        res = driver.run_SHELXTL(ins_file)
-        res.write_ins()
-        self.r1_history.append(res.r1)
+        self.run_iter(driver, ins_file)
 
-        #  Try without anisotropy
-        ins_file.remove_anisotropy()
-        self.ins_history.append(ins_file)
-        res = driver.run_SHELXTL(ins_file)
-        res.write_ins()
-        self.r1_history.append(res.r1)
-
-        #  If anisotropy helped, re-apply it
+        #  If anisotropy did not help, revert the ins file
         if self.r1_history[-2] < self.r1_history[-1]:
-            ins_file.add_anisotropy()
-            self.ins_history.append(ins_file)
-            res = driver.run_SHELXTL(ins_file)
-            res.write_ins()
-            self.r1_history.append(res.r1)
+            self.run_iter(driver, prev_ins)
 
     def try_exti(self, driver):
         """
@@ -100,28 +94,16 @@ class Optimizer():
         :return:
         """
 
+        prev_ins = copy.copy(driver.get_res_file())
+
         #  Try with extinguishing
-        ins_file = driver.get_ins_file()
+        ins_file = driver.get_res_file()
         ins_file.add_exti()
-        self.ins_history.append(ins_file)
-        res = driver.run_SHELXTL(ins_file)
-        res.write_ins()
-        self.r1_history.append(res.r1)
+        self.run_iter(driver, ins_file)
 
-        #  Try without exti
-        ins_file.remove_exti()
-        self.ins_history.append(ins_file)
-        res = driver.run_SHELXTL(ins_file)
-        res.write_ins()
-        self.r1_history.append(res.r1)
-
-        #  If exti helped, re-apply it
+        #  If exti did not help, revert the ins file
         if self.r1_history[-2] < self.r1_history[-1]:
-            ins_file.add_exti()
-            self.ins_history.append(ins_file)
-            res = driver.run_SHELXTL(ins_file)
-            res.write_ins()
-            self.r1_history.append(res.r1)
+            self.run_iter(driver, prev_ins)
 
     def try_add_q(self, driver):
         """
@@ -131,60 +113,53 @@ class Optimizer():
         """
 
         r_before = self.r1_history[-1]
+        prev_ins = copy.copy(driver.get_res_file())
         ins_file = driver.get_res_file()
+
         threshold_distance = 2.0  # No sites allowed within 2 Angstroms of other sites
         if ins_file.q_peaks[0].calc_min_distance_to_others(ins_file.crystal_sites) > threshold_distance:
             ins_file.move_q_to_crystal()
             num_elems = len(ins_file.elements)
             for elem in range(1, num_elems + 1):
                 ins_file.change_element(len(ins_file.crystal_sites)-1, elem)
-                self.ins_history.append(ins_file)
-                res = driver.run_SHELXTL(ins_file)
-                res.write_ins()
-                self.r1_history.append(res.r1)
+                self.run_iter(driver, ins_file)
             best_elem = np.argmin(self.r1_history[-num_elems:]) + 1
             ins_file.change_element(len(ins_file.crystal_sites)-1, best_elem)
-            self.ins_history.append(ins_file)
-            res = driver.run_SHELXTL(ins_file)
-            res.write_ins()
-            self.r1_history.append(res.r1)
+            self.run_iter(driver, ins_file)
 
             #   If adding one peak helped, recursively try adding another peak until it stops helping
-            if res.r1 < r_before:
+            if self.r1_history[-1] < r_before:
                 self.try_add_q(driver)
 
             #  If adding peak didn't help, take it back off
             else:
-                ins_file.move_crystal_to_q()
-                self.ins_history.append(ins_file)
-                res = driver.run_SHELXTL(ins_file)
-                res.write_ins()
-                self.r1_history.append(res.r1)
+                self.run_iter(driver, prev_ins)
 
-    def try_remove_site_old(self, driver):
-        """
-        Try adding q peaks to main crystal sites if it decreases R value
-        :param driver:
-        :return:
-        """
-        ins_file = driver.get_ins_file()
-        threshold_distance = 2.0  # No sites allowed within 2 Angstroms of other sites
-        for i, site in reversed(list(enumerate(ins_file.crystal_sites))):
-            if site.calc_min_distance_to_others(ins_file.crystal_sites) < threshold_distance:
-                r_before = self.r1_history[-1]
-                del ins_file.crystal_sites[i]
-                self.ins_history.append(ins_file)
-                res = driver.run_SHELXTL(ins_file)
-                self.r1_history.append(res.r1)
 
-                #  If removing peak didn't help, add it back on
-                if res.r1 > r_before:
-                    ins_file.crystal_sites.insert(i, site)
-                    self.ins_history.append(ins_file)
-                    res = driver.run_SHELXTL(ins_file)
-
-                    self.r1_history.append(res.r1)
-                res.write_ins()
+    # def try_remove_site_old(self, driver):
+    #     """
+    #     Try adding q peaks to main crystal sites if it decreases R value
+    #     :param driver:
+    #     :return:
+    #     """
+    #     ins_file = driver.get_ins_file()
+    #     threshold_distance = 2.0  # No sites allowed within 2 Angstroms of other sites
+    #     for i, site in reversed(list(enumerate(ins_file.crystal_sites))):
+    #         if site.calc_min_distance_to_others(ins_file.crystal_sites) < threshold_distance:
+    #             r_before = self.r1_history[-1]
+    #             del ins_file.crystal_sites[i]
+    #             self.add_to_ins_history(ins_file)
+    #             res = driver.run_SHELXTL(ins_file)
+    #             self.r1_history.append(res.r1)
+    #
+    #             #  If removing peak didn't help, add it back on
+    #             if res.r1 > r_before:
+    #                 ins_file.crystal_sites.insert(i, site)
+    #                 self.add_to_ins_history(ins_file)
+    #                 res = driver.run_SHELXTL(ins_file)
+    #
+    #                 self.r1_history.append(res.r1)
+    #             res.write_ins()
 
     def try_remove_site(self, driver):
         """
@@ -193,12 +168,13 @@ class Optimizer():
         :return:
         """
 
-        prev_ins = copy.copy(driver.get_ins_file())
-        ins_file = driver.get_ins_file()
+        prev_ins = copy.copy(driver.get_res_file())
+        ins_file = driver.get_res_file()
         r_before = self.r1_history[-1]
         r_penalty = 1.1
         ins_file.commands["ACTA"] = None
         driver.run_SHELXTL(ins_file)
+
         with open(driver.cif_file) as f:
             cif_file = CifParser.from_string(f.read())
 
@@ -223,23 +199,28 @@ class Optimizer():
                     a2_num = int(re.search('\d+', a2).group(0))
                     to_delete.add(max(a1_num, a2_num))
             ins_file.remove_sites_by_number(to_delete)
-            res = driver.run_SHELXTL(ins_file)
-            if res.r1 < r_before * r_penalty:
+            self.run_iter(driver, ins_file)
+            if self.r1_history[-1] < r_before * r_penalty or len(to_delete) == 0:
                 break
-            threshold *= 1.25
+            threshold *= 1.1
 
-        self.ins_history.append(ins_file)
-        self.r1_history.append(res.r1)
 
-    def change_occupancy(self):
+    def change_occupancy(self, driver):
+        prev_ins = copy.copy(driver.get_ins_file())
+        ins_file = driver.get_ins_file()
+        r_before = self.r1_history[-1]
+        print ins_file.write_ins()
+        for site in ins_file.crystal_sites:
+            print site.name, site.displacement  # / Element(ins_file.elements[site.element - 1].capitalize()).atomic_mass
+        quit()
+
+    def try_split_occupancy(self, driver):
         pass
 
-    def change_occupancy_prefix(self):
-        pass
 
 def main():
     path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
-    ins_path = "/Users/eantono/Documents/project_files/xtal_refinement/other_example/"
+    ins_path = "/Users/eantono/Documents/project_files/xtal_refinement/example/"
     input_prefix = "1"
     output_prefix = "temp"
 
