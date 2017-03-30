@@ -14,6 +14,7 @@ class SHELXTLDriver():
         self.hkl_file = self.directory + prefix + ".hkl"
         self.ins_file = self.directory + prefix + ".ins"
         self.res_file = self.directory + prefix + ".res"
+        self.cif_file = self.directory + prefix + ".cif"
 
         # we may want some special 1st iteration code here that operates on the first round of iteration
         # after XPREP (removing non-atom Q peaks, removing the MOLE lines etc.)

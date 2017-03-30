@@ -166,6 +166,9 @@ class SHELXTLFile():
         self.q_peaks.insert(0, self.crystal_sites[site_idx])
         del self.crystal_sites[site_idx]
 
+    def remove_sites_by_number(self, site_numbers):
+        self.crystal_sites = [site for site in self.crystal_sites if site.site_number not in site_numbers]
+
 
 
 

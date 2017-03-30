@@ -1,8 +1,12 @@
 from SHELXTLFile import SHELXTLFile
 from SHELXTLDriver import SHELXTLDriver
-import os
+import os, re, copy
 import numpy as np
 import shutil
+from pymatgen.io.cif import CifParser
+from pymatgen.core.composition import Element
+from collections import defaultdict
+
 
 class Optimizer():
     def __init__(self):
@@ -28,8 +32,9 @@ class Optimizer():
         self.try_add_q(driver)
         self.try_remove_site(driver)
         self.switch_elements(driver)
-        self.try_exti(driver)
-        self.try_anisotropy(driver)
+
+        # self.try_exti(driver)
+        # self.try_anisotropy(driver)
 
     def is_converged(self, count, max_iter=100):
         converged = False
@@ -156,7 +161,7 @@ class Optimizer():
                 res.write_ins()
                 self.r1_history.append(res.r1)
 
-    def try_remove_site(self, driver):
+    def try_remove_site_old(self, driver):
         """
         Try adding q peaks to main crystal sites if it decreases R value
         :param driver:
@@ -181,8 +186,50 @@ class Optimizer():
                     self.r1_history.append(res.r1)
                 res.write_ins()
 
+    def try_remove_site(self, driver):
+        """
+        Try adding q peaks to main crystal sites if it decreases R value
+        :param driver:
+        :return:
+        """
 
+        prev_ins = copy.copy(driver.get_ins_file())
+        ins_file = driver.get_ins_file()
+        r_before = self.r1_history[-1]
+        r_penalty = 1.1
+        ins_file.commands["ACTA"] = None
+        driver.run_SHELXTL(ins_file)
+        with open(driver.cif_file) as f:
+            cif_file = CifParser.from_string(f.read())
 
+        cif_dict = cif_file.as_dict().values()[0]
+        bonds = zip(cif_dict["_geom_bond_atom_site_label_1"], cif_dict["_geom_bond_atom_site_label_2"],
+                    cif_dict["_geom_bond_distance"])
+
+        threshold = 0.1
+        while True:
+            ins_file = copy.copy(prev_ins)
+            to_delete = set()
+            for a1, a2, distance in bonds:
+                distance = float(distance.replace("(", "").replace(")", ""))
+                el1 = Element(re.sub('\d', "", a1))
+                el2 = Element(re.sub('\d', "", a2))
+                # calculate approxiate ideal bond length
+                # this should really be covalent radii
+                ideal_distance = (el1.atomic_radius + el2.atomic_radius)
+                # if the distance is too small, remove the lower density atom
+                if (ideal_distance - distance) / ideal_distance > threshold:
+                    a1_num = int(re.search('\d+', a1).group(0))
+                    a2_num = int(re.search('\d+', a2).group(0))
+                    to_delete.add(max(a1_num, a2_num))
+            ins_file.remove_sites_by_number(to_delete)
+            res = driver.run_SHELXTL(ins_file)
+            if res.r1 < r_before * r_penalty:
+                break
+            threshold *= 1.25
+
+        self.ins_history.append(ins_file)
+        self.r1_history.append(res.r1)
 
     def change_occupancy(self):
         pass
@@ -191,10 +238,16 @@ class Optimizer():
         pass
 
 def main():
-    path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal-refinement/shelxtl/SXTL/"
-    ins_path = "/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
-    input_prefix = "absfac1"
+    path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
+    ins_path = "/Users/eantono/Documents/project_files/xtal_refinement/other_example/"
+    input_prefix = "1"
     output_prefix = "temp"
+
+    # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal-refinement/shelxtl/SXTL/"
+    # ins_path = "/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
+    # input_prefix = "absfac1"
+    # output_prefix = "temp"
+
     opt = Optimizer()
     opt.run(path_to_SXTL_dir, ins_path, input_prefix, output_prefix)
     print opt.r1_history

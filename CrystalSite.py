@@ -1,4 +1,5 @@
 import numpy as np
+import re
 
 
 #  TODO: CURRENT DISTANCE CALCULATION IS WRONG
@@ -6,6 +7,7 @@ import numpy as np
 class CrystalSite:
     def __init__(self, line_list):
         self.name = None
+        self.site_number = None
         self.position = None
         self.occupancy_prefix = None
         self.occupancy = None
@@ -24,6 +26,7 @@ class CrystalSite:
         #Handle Q peaks:
         if (line_list[0][0] == "Q"):
             self.name = line_list[0]
+            self.site_number = int(re.search('\d+', self.name).group(0))
             self.element = int(line_list[1])
             self.position = np.asarray([float(line_list[2]), float(line_list[3]), float(line_list[4])])
             self.occupancy_prefix = int(line_list[5][0])
@@ -34,6 +37,7 @@ class CrystalSite:
         # Handles assigned sites:
         else:
             self.name = line_list[0]
+            self.site_number = int(re.search('\d+', self.name).group(0))
             self.element = int(line_list[1])
             self.position = np.asarray([float(line_list[2]), float(line_list[3]), float(line_list[4])])
             self.occupancy_prefix = int(line_list[5][0])
