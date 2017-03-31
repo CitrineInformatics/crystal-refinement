@@ -124,7 +124,7 @@ class SHELXTLFile():
             if self.commands[key] is not None:
                 res += " ".join(self.commands[key])
             res += "\n"
-        res += "FVAR " + " ".join(self.fvar_vals) + "\n"
+        res += "FVAR " + " ".join([str(x) for x in self.fvar_vals]) + "\n"
         res += "\n".join([" ".join(cs.write_line()) for cs in self.crystal_sites]) + "\n"
         res += self.extra_text[2]
 
@@ -167,6 +167,13 @@ class SHELXTLFile():
 
     def remove_sites_by_number(self, site_numbers):
         self.crystal_sites = [site for site in self.crystal_sites if site.site_number not in site_numbers]
+
+    def add_variable_occupancy(self, site_index):
+        site = self.crystal_sites[site_index]
+        if site.occupancy_prefix == 1:
+            self.fvar_vals.append(0.5)
+            site.occupancy_prefix = len(self.fvar_vals)
+
 
 
 

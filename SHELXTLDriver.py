@@ -32,17 +32,20 @@ class SHELXTLDriver():
         return SHELXTLFile(res_text)
 
     # takes .ins file and returns resulting .res file
-    def run_SHELXTL(self, ins_file_obj):
+    def run_SHELXTL(self, ins_file_obj, suppress_output=True):
         with open(self.ins_file, 'w') as f:
             f.write(ins_file_obj.get_ins_text())
-        self.run_SHELXTL_command()
+        self.run_SHELXTL_command(suppress_output=suppress_output)
         return self.get_res_file()
 
-    def run_SHELXTL_command(self, cmd="xl.exe"):
+    def run_SHELXTL_command(self, cmd="xl.exe", suppress_output=True):
         command_args = [os.path.join(self.path_to_SXTL_dir, cmd), self.file_prefix]
         if self.is_macOS:
             command_args = ["wine"] + command_args
-        subprocess.call(command_args)
+        if suppress_output:
+            subprocess.call(command_args, stdout=open(os.devnull, "w"))
+        else:
+            subprocess.call(command_args)
 
 
 def main():
@@ -56,7 +59,7 @@ def main():
     file_obj = driver.get_ins_file()
     file_obj.add_anisotropy()
     file_obj.change_element(1, 1)
-    driver.run_SHELXTL(file_obj).write_ins()
+    driver.run_SHELXTL(file_obj).get_ins_text()
 
 
 if __name__ == "__main__":

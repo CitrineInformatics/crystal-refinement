@@ -1,6 +1,6 @@
 from SHELXTLFile import SHELXTLFile
 from SHELXTLDriver import SHELXTLDriver
-import os, re, copy
+import os, re, copy, math
 import numpy as np
 import shutil
 from pymatgen.io.cif import CifParser
@@ -31,8 +31,9 @@ class Optimizer():
         self.try_add_q(driver)
         self.try_remove_site(driver)
         self.switch_elements(driver)
-        # self.change_occupancy(driver)
-        self.try_split_occupancy(driver)
+        self.change_occupancy(driver)
+        # self.try_split_occupancy(driver)
+        # quit()
         self.try_exti(driver)
         self.try_anisotropy(driver)
 
@@ -55,11 +56,11 @@ class Optimizer():
         return converged
 
     def switch_elements(self, driver):
-        ins_file = driver.get_ins_file()
+        ins_file = driver.get_res_file()
 
         # Want to make changes from largest displacement to smallest
         displacements = map((lambda x: x.displacement), ins_file.crystal_sites)
-        order = (np.argsort(np.asarray(displacements)[::-1])).tolist()
+        order = (np.argsort(np.asarray(displacements))[::-1]).tolist()
         num_elems = len(ins_file.elements)
         for i in order:
             for elem in range(1, num_elems+1):
@@ -76,10 +77,10 @@ class Optimizer():
         :return:
         """
 
-        prev_ins = copy.copy(driver.get_res_file())
+        ins_file = driver.get_res_file()
+        prev_ins = copy.copy(ins_file)
 
         #  Try with anisotropy
-        ins_file = driver.get_res_file()
         ins_file.add_anisotropy()
         self.run_iter(driver, ins_file)
 
@@ -94,10 +95,10 @@ class Optimizer():
         :return:
         """
 
-        prev_ins = copy.copy(driver.get_res_file())
+        ins_file = driver.get_res_file()
+        prev_ins = copy.copy(ins_file)
 
         #  Try with extinguishing
-        ins_file = driver.get_res_file()
         ins_file.add_exti()
         self.run_iter(driver, ins_file)
 
@@ -113,8 +114,8 @@ class Optimizer():
         """
 
         r_before = self.r1_history[-1]
-        prev_ins = copy.copy(driver.get_res_file())
         ins_file = driver.get_res_file()
+        prev_ins = copy.copy(ins_file)
 
         threshold_distance = 2.0  # No sites allowed within 2 Angstroms of other sites
         if ins_file.q_peaks[0].calc_min_distance_to_others(ins_file.crystal_sites) > threshold_distance:
@@ -168,8 +169,8 @@ class Optimizer():
         :return:
         """
 
-        prev_ins = copy.copy(driver.get_res_file())
         ins_file = driver.get_res_file()
+        prev_ins = copy.copy(ins_file)
         r_before = self.r1_history[-1]
         r_penalty = 1.1
         ins_file.commands["ACTA"] = None
@@ -206,21 +207,67 @@ class Optimizer():
 
 
     def change_occupancy(self, driver):
-        prev_ins = copy.copy(driver.get_ins_file())
-        ins_file = driver.get_ins_file()
-        r_before = self.r1_history[-1]
-        print ins_file.write_ins()
-        for site in ins_file.crystal_sites:
-            print site.name, site.displacement  # / Element(ins_file.elements[site.element - 1].capitalize()).atomic_mass
-        quit()
+        ins_file = driver.get_res_file()
+        # Want to make changes from largest displacement to smallest
+        displacements = map((lambda x: x.displacement), ins_file.crystal_sites)
+
+        for i, displacement in sorted(enumerate(displacements), key=lambda tup: -tup[1]):
+            ins_file = driver.get_res_file()
+            prev_ins = copy.copy(ins_file)
+            r_before = self.r1_history[-1]
+            # arbitrary threshold for which occupancies to change
+            mean = np.mean(displacements[:i] + displacements[i+1:])
+            std = np.std(displacements[:i] + displacements[i+1:])
+            if abs(displacement - mean) / std < 2:
+                break
+            ins_file = driver.get_res_file()
+            ins_file.add_variable_occupancy(i)
+            res = self.run_iter(driver, ins_file)
+            # if r1 or displacement go up, undo
+            if self.r1_history[-1] > r_before or res.crystal_sites[i].displacement > displacement:
+                self.run_iter(driver, prev_ins)
+
 
     def try_split_occupancy(self, driver):
-        pass
+        ins_file = driver.get_res_file()
+        prev_ins = copy.copy(ins_file)
+        r_before = self.r1_history[-1]
+        r_penalty = 1.1
+        ins_file.commands["ACTA"] = None
+        driver.run_SHELXTL(ins_file)
+
+        with open(driver.cif_file) as f:
+            cif_file = CifParser.from_string(f.read())
+
+        cif_dict = cif_file.as_dict().values()[0]
+        bonds = zip(cif_dict["_geom_bond_atom_site_label_1"], cif_dict["_geom_bond_atom_site_label_2"],
+                    cif_dict["_geom_bond_distance"])
+        for site in ins_file.crystal_sites:
+            coord = 0
+            for a1, a2, distance in bonds:
+                if a1 == site.name.capitalize() or a2 == site.name.capitalize():
+                    coord += 1
+            print site.name, coord
+        # quit()
+        bonds_with_score = []
+        for a1, a2, distance in bonds:
+            distance = float(distance.replace("(", "").replace(")", ""))
+            el1 = Element(re.sub('\d', "", a1))
+            el2 = Element(re.sub('\d', "", a2))
+            # calculate approxiate ideal bond length
+            # this should really be covalent radii
+            ideal_distance = (el1.atomic_radius + el2.atomic_radius)
+            bonds_with_score.append((a1, a2, distance, ideal_distance, ideal_distance - distance))
+
+        for x in sorted(bonds_with_score, key= lambda tup: -abs(tup[4])):
+            print x
+        quit()
+
 
 
 def main():
     path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
-    ins_path = "/Users/eantono/Documents/project_files/xtal_refinement/example/"
+    ins_path = "/Users/eantono/Documents/project_files/xtal_refinement/other_example/"
     input_prefix = "1"
     output_prefix = "temp"
 
