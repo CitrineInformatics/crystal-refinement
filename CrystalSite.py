@@ -62,7 +62,7 @@ class CrystalSite:
         if (self.name[0] == "Q"):
             line_list += ['{:.6f}'.format(self.electron_density)]
         if (self.anisotropy is not None):
-            line_list += ['{:.6f}'.format(x) for x in self.anisotropy.tolist()]
+            line_list += ['=\n'] + ['{:.6f}'.format(x) for x in self.anisotropy.tolist()]
         return line_list
 
 
