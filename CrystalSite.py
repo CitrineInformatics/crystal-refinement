@@ -40,8 +40,8 @@ class CrystalSite:
             self.site_number = int(re.search('\d+', self.name).group(0))
             self.element = int(line_list[1])
             self.position = np.asarray([float(line_list[2]), float(line_list[3]), float(line_list[4])])
-            self.occupancy_prefix = int(line_list[5][0])
-            self.occupancy = float(line_list[5][1:])
+            self.occupancy_prefix = int(line_list[5][:(line_list[5].index(".") - 1)])
+            self.occupancy = float(line_list[5][(line_list[5].index(".") - 1):])
             self.displacement = float(line_list[6])
             if len(line_list) > 7:
                 self.anisotropy = np.asarray([float(x) for x in line_list[7:]])

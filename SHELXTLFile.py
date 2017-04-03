@@ -1,4 +1,4 @@
-import re
+import re, copy
 from CrystalSite import CrystalSite
 
 # Parser for .ins and .res SHELLXTL files
@@ -13,7 +13,7 @@ class SHELXTLFile():
         self.formula_units = []
 
         # Stores commands as dict.  If command has no value, value is set to None
-        self.commands = {}
+        self.commands = []
 
         self.fvar_vals = []
 
@@ -21,11 +21,13 @@ class SHELXTLFile():
         # ex. SM1   4    0.086929    0.000000    0.881287    10.50000    0.00621    0.00453 =
         #           0.00623    0.00000    0.00199    0.00000
         self.crystal_sites = []
+        self.mixed_sites = []
 
         # crystal site info (for easier distance calculation and translation between atom sites and q sites)
         self.q_peaks = []
 
         self.r1 = 0.0
+        self.suggested_weight_vals = ""
         self.read(filetxt)
 
     # do actual file parsing
@@ -69,14 +71,14 @@ class SHELXTLFile():
                 if key == "FVAR":
                     self.fvar_vals = split[1:]
                 elif len(split) == 1:
-                    self.commands[key] = None
+                    self.commands.append((key, None))
                 else:
                     if key == "MOLE":
                         break
                     elif key[:-1] in starting_element_keys:
                         break
                     else:
-                        self.commands[key] = split[1:]
+                        self.commands.append((key, split[1:]))
             line_idx += 1
 
         # Crystal site section
@@ -106,6 +108,8 @@ class SHELXTLFile():
             line = lines[line_idx]
             if "REM R1 =" in line:
                 self.r1 = float(re.search("REM R1 =\s*(\d*\.\d+)", line).group(1))
+            if "WGHT" in line:
+                self.suggested_weight_vals = line.split()[1:]
             self.extra_text[self.extra_text_section] += line + "\n"
             if len(line) > 0 and line[0] == "Q" and line[1].isdigit():
                 crystal_info = line.split()
@@ -119,10 +123,10 @@ class SHELXTLFile():
         res += "SFAC " + " ".join(self.elements) + "\n"
         res += "UNIT " + " ".join(self.formula_units) + "\n"
         res += self.extra_text[1] + "\n \n"
-        for key in self.commands.keys():
+        for key, values in self.commands:
             res += key + "  "
-            if self.commands[key] is not None:
-                res += " ".join(self.commands[key])
+            if values is not None:
+                res += " ".join(values)
             res += "\n"
         res += "FVAR " + " ".join([str(x) for x in self.fvar_vals]) + "\n"
         res += "\n".join([" ".join(cs.write_line()) for cs in self.crystal_sites]) + "\n"
@@ -133,25 +137,30 @@ class SHELXTLFile():
 
 
     # various editing methods ...
+
+    def add_no_arg_command(self, cmd):
+        if cmd not in map(lambda tup: tup[0], self.commands):
+            self.commands.append((cmd, None))
+
+    def remove_command(self, cmd):
+        cmd_keys = map(lambda tup: tup[0], self.commands)
+        if cmd in cmd_keys:
+            indices = [i for i, val in enumerate(cmd_keys) if val is cmd]
+            indices.reverse()
+            for i in indices:
+                del self.commands[i]
+
     def add_anisotropy(self):
-        cmd = "ANIS"
-        if cmd not in self.commands:
-            self.commands[cmd] = None
+        self.add_no_arg_command("ANIS")
 
     def remove_anisotropy(self):
-        cmd = "ANIS"
-        if cmd in self.commands:
-            del self.commands[cmd]
+        self.remove_command("ANIS")
 
     def add_exti(self):
-        cmd = "EXTI"
-        if cmd not in self.commands:
-            self.commands[cmd] = None
+        self.add_no_arg_command("EXTI")
 
     def remove_exti(self):
-        cmd = "EXTI"
-        if cmd in self.commands:
-            del self.commands[cmd]
+        self.remove_command("EXTI")
 
     def change_element(self, site_index, element_index):
         self.crystal_sites[site_index].element = element_index
@@ -174,8 +183,35 @@ class SHELXTLFile():
             self.fvar_vals.append(0.5)
             site.occupancy_prefix = len(self.fvar_vals)
 
+    def add_site_mixing(self, site_number, mixing_element_indices):
+        site_indices = self.get_crystal_sites_by_number(site_number)
+        self.commands.append(("EXYZ", [self.elements[i] + str(site_number) for i in mixing_element_indices]))
+        self.commands.append(("EADP", [self.elements[i] + str(site_number) for i in mixing_element_indices]))
 
+        # this is 2 site mixing only
+        self.fvar_vals.append(0.5)
 
+        mixed_sites = []
+
+        for i, element_idx in enumerate(mixing_element_indices):
+            new_site = copy.deepcopy(self.crystal_sites[site_indices[0]])
+            new_site.name = self.elements[element_idx] + str(site_number)
+            new_site.element = element_idx + 1
+            if i == 0:
+                new_site.occupancy_prefix = len(self.fvar_vals)
+            else:
+                new_site.occupancy_prefix = -len(self.fvar_vals)
+            mixed_sites.append(new_site)
+
+            # for site in mixed_sites:
+            # print site.occupancy_prefix, site.write_line()
+        self.remove_sites_by_number([site_number])
+        self.crystal_sites.extend(mixed_sites)
+        self.crystal_sites.sort(key=lambda site: site.site_number)
+        self.mixed_sites.append(site_number)
+
+    def get_crystal_sites_by_number(self, index):
+        return [i for i, site in enumerate(self.crystal_sites) if site.site_number == index]
 
 
 def main():
