@@ -1,6 +1,6 @@
 from SHELXTLFile import SHELXTLFile
 from SHELXTLDriver import SHELXTLDriver
-import os, re, copy, math, itertools
+import os, re, copy, math, itertools, random
 import numpy as np
 import shutil
 from pymatgen.io.cif import CifParser
@@ -316,7 +316,9 @@ def main():
     # ins_path = "/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
     # input_prefix = "absfac1"
     # output_prefix = "temp"
-    for dirname in os.listdir(ins_folder):
+    subdirs = os.listdir(ins_folder)
+    # random.shuffle(subdirs)
+    for dirname in subdirs:
         if dirname[0] != "." and dirname[0] != "!":
             ins_path = os.path.join(ins_folder, dirname, "work") + "/"
             sorted_files = sorted(os.listdir(ins_path), key=lambda filename: os.path.getmtime(os.path.join(ins_path, filename)))
@@ -342,7 +344,31 @@ def main():
             print open(os.path.join(ins_path, output_prefix + ".res"))
             quit()
 
+def test_main():
+    path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
+    ins_path = "/Users/eantono/Documents/project_files/xtal_refinement/Ce4Co2InCe4Ex/"
+    input_prefix = "c2mxs1"
+    output_prefix = "temp"
+
+    sorted_files = sorted(os.listdir(ins_path), key=lambda filename: os.path.getmtime(os.path.join(ins_path, filename)))
+    final_res = ""
+    for filename in reversed(sorted_files):
+        if output_prefix in filename:
+            continue
+        if ".res" in filename:
+            final_res = os.path.join(ins_path, filename)
+    shutil.copy(os.path.join(ins_path, "raw.hkl"), os.path.join(ins_path, input_prefix + ".hkl"))
+    opt = Optimizer()
+    opt.run(path_to_SXTL_dir, ins_path, input_prefix, output_prefix)
+
+    print opt.r1_history
+    print open(final_res).read()
+    print "#" * 50
+    print open(os.path.join(ins_path, output_prefix + ".res")).read()
+
+
 if __name__ == "__main__":
-    main()
+    # main()
+    test_main()
 
 

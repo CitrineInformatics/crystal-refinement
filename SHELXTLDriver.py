@@ -32,7 +32,7 @@ class SHELXTLDriver():
         return SHELXTLFile(res_text)
 
     # takes .ins file and returns resulting .res file
-    def run_SHELXTL(self, ins_file_obj, suppress_output=False):
+    def run_SHELXTL(self, ins_file_obj, suppress_output=True):
         with open(self.ins_file, 'w') as f:
             f.write(ins_file_obj.get_ins_text())
         self.run_SHELXTL_command(suppress_output=suppress_output)
@@ -40,7 +40,6 @@ class SHELXTLDriver():
 
     def run_SHELXTL_command(self, cmd="xl.exe", suppress_output=False):
         command_args = [os.path.join(self.path_to_SXTL_dir, cmd), self.file_prefix]
-        print command_args
         if self.is_macOS:
             command_args = ["wine"] + command_args
         if suppress_output:
