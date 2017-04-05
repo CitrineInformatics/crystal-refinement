@@ -12,7 +12,7 @@ class CrystalSite:
         :param line_list:
         """
         self.name = None   # For example, this might be Fe1
-        self.site_number = None   #
+        self.site_number = None   # This would be 1 if the name is Fe1
         self.position = None  # This will be a 1X3 numpy array with the x, y, z coordinates
         self.occupancy_prefix = None  # This is a 1 in the case of fixed occupancy
         self.occupancy = None  # This number depends on the site symmetry.  Often it is 0.5
