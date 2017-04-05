@@ -1,20 +1,25 @@
 import numpy as np
 import re
 
-
-#  TODO: CURRENT DISTANCE CALCULATION IS WRONG
-
 class CrystalSite:
+    """
+    Define class to hold information about a single crystal site or Q peak
+    """
     def __init__(self, line_list):
-        self.name = None
-        self.site_number = None
-        self.position = None
-        self.occupancy_prefix = None
-        self.occupancy = None
-        self.displacement = None
-        self.electron_density = None
-        self.anisotropy = None
-        self.element = None
+        """
+        Given a list of strings, assign values to the name, site_number, etc of the site
+
+        :param line_list:
+        """
+        self.name = None   # For example, this might be Fe1
+        self.site_number = None   #
+        self.position = None  # This will be a 1X3 numpy array with the x, y, z coordinates
+        self.occupancy_prefix = None  # This is a 1 in the case of fixed occupancy
+        self.occupancy = None  # This number depends on the site symmetry.  Often it is 0.5
+        self.displacement = None  # The displacement of the atom
+        self.electron_density = None  # The calculated electron density
+        self.anisotropy = None  # If anisotropy has been turned on, this records the anisotropy coefficients
+        self.element = None  # This is the integer that refers to the element type in this location
         self.read_line(line_list)
 
     def read_line(self, line_list):
@@ -23,8 +28,8 @@ class CrystalSite:
 
         :param line_list: List of strings from the input file describing a crystal site
         """
-        #Handle Q peaks:
-        if (line_list[0][0] == "Q"):
+        #  Handle Q peaks:
+        if line_list[0][0] == "Q":
             self.name = line_list[0]
             self.site_number = int(re.search('\d+', self.name).group(0))
             self.element = int(line_list[1])
@@ -65,8 +70,6 @@ class CrystalSite:
             line_list += ['=\n'] + ['{:.6f}'.format(x) for x in self.anisotropy.tolist()]
         return line_list
 
-
-
     def set_element(self, element):
         self.element = element
 
@@ -76,27 +79,6 @@ class CrystalSite:
     def get_position(self):
         return self.position
 
-    def calc_min_distance_to_others(self, others):
-        min_dist = np.infty
-        for cs in others:
-            dist = CrystalSite.calc_distance(self, cs)
-            min_dist = np.minimum(min_dist, dist)
-        return min_dist
 
-    @staticmethod
-    def calc_distance(site1, site2):
-        """
-        Calculate Euclidean distances between two sites
-        :param site1: first site
-        :param site2: second site
-        :return:
-        >>> cs1 = CrystalSite("SM2   4    0.153587    0.000000    0.432975    10.50000    0.00602".split())
-        >>> cs2 = CrystalSite("IN3   3    0.000000   -0.500000    0.500000    20.25000    0.00749".split())
-        >>> '{:.6f}'.format(CrystalSite.calc_distance(cs1, cs2))
-        '0.527334'
-        """
-        assert(site1.position.shape == site2.position.shape)
-        dist = np.sqrt(np.sum(np.square(site1.position - site2.position)))
-        return dist
 
 
