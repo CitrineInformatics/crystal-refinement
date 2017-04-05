@@ -1,10 +1,11 @@
 import subprocess, tempfile, shutil, os
-from SHELXTLFile import SHELXTLFile
+from SHELXFile import SHELXFile
 
 # flag for operating system
 # interface that takes and returns SHELXTLFile objects and does SHELXTL things
 
-class SHELXTLDriver():
+
+class SHELXDriver:
     def __init__(self, ins_path, prefix, path_to_SXTL_dir, is_macOS=True):
         self.is_macOS = is_macOS
         self.path_to_SXTL_dir = path_to_SXTL_dir
@@ -24,12 +25,12 @@ class SHELXTLDriver():
     def get_ins_file(self):
         with open(self.ins_file) as f:
             ins_text = f.read()
-        return SHELXTLFile(ins_text)
+        return SHELXFile(ins_text)
 
     def get_res_file(self):
         with open(self.res_file) as f:
             res_text = f.read()
-        return SHELXTLFile(res_text)
+        return SHELXFile(res_text)
 
     # takes .ins file and returns resulting .res file
     def run_SHELXTL(self, ins_file_obj, suppress_output=True):
@@ -55,7 +56,7 @@ def main():
     ins_path="/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
     prefix = "orig"
     os.chdir(ins_path)
-    driver = SHELXTLDriver(ins_path=ins_path, prefix=prefix, path_to_SXTL_dir=path_to_SXTL_dir, is_macOS=True)
+    driver = SHELXDriver(ins_path=ins_path, prefix=prefix, path_to_SXTL_dir=path_to_SXTL_dir, is_macOS=True)
     file_obj = driver.get_ins_file()
     file_obj.add_anisotropy()
     file_obj.change_element(1, 1)

@@ -3,7 +3,8 @@ from CrystalSite import CrystalSite
 
 #TODO JL: REPLACE ALL main() with examples that will run locally
 
-class SHELXTLFile():
+
+class SHELXFile:
     """
     This class acts as a parser for .ins and .res SHELX files
     """
@@ -264,7 +265,7 @@ def main():
         text = f.read()
         print text
         print "\n\n" + "~"*50 + "\n\n"
-        file_obj = SHELXTLFile(text)
+        file_obj = SHELXFile(text)
 
         print file_obj.write_ins()
 

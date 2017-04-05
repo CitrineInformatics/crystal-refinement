@@ -1,5 +1,5 @@
-from SHELXTLFile import SHELXTLFile
-from SHELXTLDriver import SHELXTLDriver
+from SHELXFile import SHELXFile
+from SHELXDriver import SHELXDriver
 import os, re, copy, math, itertools, random
 import numpy as np
 import shutil
@@ -9,7 +9,7 @@ from pymatgen.structure_prediction.substitution_probability import SubstitutionP
 from collections import defaultdict
 
 
-class Optimizer():
+class Optimizer:
     def __init__(self):
         self.ins_history = []
         self.r1_history = []
@@ -18,7 +18,7 @@ class Optimizer():
         os.chdir(ins_path)
         shutil.copy(ins_path + input_prefix + ".hkl", ins_path + output_prefix + ".hkl")
         shutil.copy(ins_path + input_prefix + ".ins", ins_path + output_prefix + ".ins")
-        driver = SHELXTLDriver(ins_path=ins_path, prefix=output_prefix, path_to_SXTL_dir=path_to_SXTL_dir, is_macOS=True)
+        driver = SHELXDriver(ins_path=ins_path, prefix=output_prefix, path_to_SXTL_dir=path_to_SXTL_dir, is_macOS=True)
 
         # Run first iteration
         driver.run_SHELXTL_command(cmd="xs")
@@ -128,24 +128,22 @@ class Optimizer():
         ins_file = driver.get_res_file()
         prev_ins = copy.deepcopy(ins_file)
 
-        threshold_distance = 2.0  # No sites allowed within 2 Angstroms of other sites
-        if ins_file.q_peaks[0].calc_min_distance_to_others(ins_file.crystal_sites) > threshold_distance:
-            ins_file.move_q_to_crystal()
-            num_elems = len(ins_file.elements)
-            for elem in range(1, num_elems + 1):
-                ins_file.change_element(len(ins_file.crystal_sites)-1, elem)
-                self.run_iter(driver, ins_file)
-            best_elem = np.argmin(self.r1_history[-num_elems:]) + 1
-            ins_file.change_element(len(ins_file.crystal_sites)-1, best_elem)
+        ins_file.move_q_to_crystal()
+        num_elems = len(ins_file.elements)
+        for elem in range(1, num_elems + 1):
+            ins_file.change_element(len(ins_file.crystal_sites)-1, elem)
             self.run_iter(driver, ins_file)
+        best_elem = np.argmin(self.r1_history[-num_elems:]) + 1
+        ins_file.change_element(len(ins_file.crystal_sites)-1, best_elem)
+        self.run_iter(driver, ins_file)
 
-            #   If adding one peak helped, recursively try adding another peak until it stops helping
-            if self.r1_history[-1] < r_before:
-                self.try_add_q(driver)
+        #   If adding one peak helped, recursively try adding another peak until it stops helping
+        if self.r1_history[-1] < r_before:
+            self.try_add_q(driver)
 
-            #  If adding peak didn't help, take it back off
-            else:
-                self.run_iter(driver, prev_ins)
+        #  If adding peak didn't help, take it back off
+        else:
+            self.run_iter(driver, prev_ins)
 
 
     def use_suggested_weights(self, driver):
