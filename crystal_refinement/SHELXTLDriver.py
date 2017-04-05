@@ -51,7 +51,7 @@ class SHELXTLDriver():
 def main():
     # path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL"
     # test_path = "/Users/eantono/Documents/project_files/xtal_refinement/example/temp"
-    path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal-refinement/shelxtl/SXTL/"
+    path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
     ins_path="/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
     prefix = "orig"
     os.chdir(ins_path)

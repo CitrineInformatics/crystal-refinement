@@ -1,7 +1,7 @@
 from distutils.core import setup
 
 setup(
-    name='crystal-refinement',
+    name='crystal_refinement',
     version='0.0.1',
     packages=[''],
     url='citrine.io',

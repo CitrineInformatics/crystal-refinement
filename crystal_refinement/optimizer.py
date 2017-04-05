@@ -312,7 +312,7 @@ def main():
     # input_prefix = "1"
     output_prefix = "temp"
 
-    # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal-refinement/shelxtl/SXTL/"
+    # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
     # ins_path = "/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
     # input_prefix = "absfac1"
     # output_prefix = "temp"
@@ -347,7 +347,7 @@ def main():
 def test_main():
     path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
     ins_path = "/Users/eantono/Documents/project_files/xtal_refinement/Ce4Co2InCe4Ex/"
-    path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal-refinement/shelxtl/SXTL/"
+    path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
     ins_path = "/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
 
     input_prefix = "c2mxs1"
