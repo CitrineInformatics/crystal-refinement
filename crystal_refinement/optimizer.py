@@ -10,21 +10,33 @@ from collections import defaultdict
 
 
 class Optimizer:
+    """
+    Class for performing single crystal refinement
+    """
     def __init__(self):
-        self.ins_history = []
-        self.r1_history = []
+        self.ins_history = []  # History of all previous ins files
+        self.r1_history = []  # History of all previous R1 values
 
-    def run(self, path_to_SXTL_dir, ins_path, input_prefix, output_prefix):
+    def run(self, path_to_SXTL_dir, ins_path, input_prefix, output_prefix, use_wine=False):
+        """
+        Method to run the optimization
+        :param path_to_SXTL_dir: path to xl/xs executables
+        :param ins_path: path to ins file output by xprep
+        :param input_prefix: prefix of ins file (eg for file.ins, the prefix would be "file")
+        :param output_prefix: prefix of the result file that the optimizer will output
+        :return:
+        """
+        # Copy ins and hkl file to output prefix
         os.chdir(ins_path)
         shutil.copy(ins_path + input_prefix + ".hkl", ins_path + output_prefix + ".hkl")
         shutil.copy(ins_path + input_prefix + ".ins", ins_path + output_prefix + ".ins")
-        driver = SHELXDriver(ins_path=ins_path, prefix=output_prefix, path_to_SXTL_dir=path_to_SXTL_dir, use_wine=True)
+        driver = SHELXDriver(ins_path=ins_path, prefix=output_prefix, path_to_SXTL_dir=path_to_SXTL_dir, use_wine=use_wine)
 
-        # Run first iteration
+        # Run first iteration using xs
         driver.run_SHELXTL_command(cmd="xs")
         shutil.copy(ins_path + output_prefix + ".res", ins_path + output_prefix + ".ins")
 
-        # Read in and run initial SHELXTL file
+        # Read in and run initial SHELX file
         ins_file = driver.get_ins_file()
         self.run_iter(driver, ins_file)
 
@@ -35,9 +47,6 @@ class Optimizer:
         # There is currently an inherent assumption that switch elements will never be called after site mixing, since
         # after site mixing, the indices don't line up anymore
         self.try_site_mixing(driver)
-        # print driver.get_ins_file().filetxt
-        # print "#"*50
-        # print driver.get_res_file().filetxt
         self.change_occupancy(driver)
         self.try_exti(driver)
         self.try_anisotropy(driver)
@@ -46,9 +55,9 @@ class Optimizer:
     def run_iter(self, driver, ins_file, ins_history=None, r1_history=None):
         """
         Run the given ins file through SHELXTL and record the file and resulting r1
-        :param driver:
-        :param ins_file:
-        :return:
+        :param driver: SHELXDriver object
+        :param ins_file: SHELXFile object
+        :return res: SHELXFile object
         """
         if ins_history is None:
             ins_history = self.ins_history
@@ -59,12 +68,6 @@ class Optimizer:
         res = driver.run_SHELXTL(ins_file)
         r1_history.append(res.r1)
         return res
-
-    def is_converged(self, count, max_iter=100):
-        converged = False
-        if count >= max_iter or self.r1_history[-1] < 0.02:
-            converged = True
-        return converged
 
     def switch_elements(self, driver):
         ins_file = driver.get_res_file()
@@ -84,7 +87,7 @@ class Optimizer:
     def try_anisotropy(self, driver):
         """
         Test if adding anisotropy reduces R1 value.  If it does, do so.
-        :param driver: SHELXTL driver to run ins file
+        :param driver: SHELX driver to run ins file
         :return:
         """
 
@@ -102,7 +105,7 @@ class Optimizer:
     def try_exti(self, driver):
         """
         Test if adding extinguishing reduces R1 value.  If it does, do so.
-        :param driver: SHELXTL driver to run ins file
+        :param driver: SHELX driver to run ins file
         :return:
         """
 
@@ -120,15 +123,16 @@ class Optimizer:
     def try_add_q(self, driver):
         """
         Try adding q peaks to main crystal sites if it decreases R value
-        :param driver:
+        :param driver: SHELX driver
         :return:
         """
 
         r_before = self.r1_history[-1]
         ins_file = driver.get_res_file()
         prev_ins = copy.deepcopy(ins_file)
-
         ins_file.move_q_to_crystal()
+
+        # Find best element for new site
         num_elems = len(ins_file.elements)
         for elem in range(1, num_elems + 1):
             ins_file.change_element(len(ins_file.crystal_sites)-1, elem)
@@ -147,15 +151,22 @@ class Optimizer:
 
 
     def use_suggested_weights(self, driver):
+        """
+        Stop re-initializing weights each time--use previously suggested weights
+        :param driver:
+        :return:
+        """
         ins_file = driver.get_res_file()
         ins_file.remove_command("WGHT")
         ins_file.commands.append(("WGHT", ins_file.suggested_weight_vals))
         self.run_iter(driver, ins_file)
 
-    def try_remove_site(self, driver):
+    def try_remove_site(self, driver, ml_model=False):
         """
-        Try adding q peaks to main crystal sites if it decreases R value
-        :param driver:
+        Remove crystal sites if they result in bond distances that are too short
+        :param driver: SHELX driver
+        :param ml_model: if True, a machine learning model is used to predict the correct bond length.
+                         if False, the ideal bond length is approximated as the sum of the atomic radii
         :return:
         """
 
@@ -163,13 +174,13 @@ class Optimizer:
         prev_ins = copy.deepcopy(ins_file)
         r_before = self.r1_history[-1]
         r_penalty = 1.1
-        ins_file.add_no_arg_command("ACTA")
+
+        #  Use CIF file to get distances between sites
+        ins_file.add_no_arg_command("ACTA")  # To write out CIF file
         driver.run_SHELXTL(ins_file)
         ins_file.remove_command("ACTA")
-
         with open(driver.cif_file) as f:
             cif_file = CifParser.from_string(f.read())
-
         cif_dict = cif_file.as_dict().values()[0]
         bonds = zip(cif_dict["_geom_bond_atom_site_label_1"], cif_dict["_geom_bond_atom_site_label_2"],
                     cif_dict["_geom_bond_distance"])
@@ -182,9 +193,9 @@ class Optimizer:
                 distance = float(distance.replace("(", "").replace(")", ""))  # Take off parenthesis
                 el1 = Element(re.sub('\d', "", a1))
                 el2 = Element(re.sub('\d', "", a2))
-                # calculate approxiate ideal bond length
-                # this should really be covalent radii
-                ideal_distance = (el1.atomic_radius + el2.atomic_radius)
+                if not ml_model:
+                    # Use pymatgen to get approximate bond length = sum of atomic radii
+                    ideal_distance = (el1.atomic_radius + el2.atomic_radius)
                 # if the distance is too small, remove the lower density atom
                 if (ideal_distance - distance) / ideal_distance > threshold:
                     a1_num = int(re.search('\d+', a1).group(0))
@@ -203,16 +214,17 @@ class Optimizer:
         displacements = map((lambda x: x.displacement), ins_file.crystal_sites)
 
         for i, displacement in sorted(enumerate(displacements), key=lambda tup: -tup[1]):
-            # don't change occupancy of mixed sites cuz you don't know how
+            # don't change occupancy of mixed sites
             if ins_file.crystal_sites[i].site_number in ins_file.mixed_sites:
                 continue
             ins_file = driver.get_res_file()
             prev_ins = copy.deepcopy(ins_file)
             r_before = self.r1_history[-1]
-            # arbitrary threshold for which occupancies to change
+
+            # only change occupancy if displacement is >= 2 std deviations away from mean
             mean = np.mean(displacements[:i] + displacements[i+1:])
             std = np.std(displacements[:i] + displacements[i+1:])
-            if abs(displacement - mean) / std < 2:
+            if abs(displacement - mean) / std < 2.0:
                 break
             ins_file = driver.get_res_file()
             ins_file.add_variable_occupancy(i)
@@ -222,25 +234,47 @@ class Optimizer:
                 self.run_iter(driver, prev_ins)
 
     def get_specie(self, el, ox):
+        """
+        Return string for ion
+        :param el: Element abbreviation (eg. Fe, Au, ...)
+        :param ox: Oxidation number (eg. +2)
+        :return: eg. Fe2+
+        """
         if ox > 0:
             return el.symbol + str(ox) + "+"
         else:
             return el.symbol + str(abs(ox)) + "-"
 
     def get_substitution_probability(self, el1, el2):
+        """
+        Use pymatgen to calculate substitution probability for use in site mixing
+        :param el1: name of first element
+        :param el2: name of second element
+        :return: total probability of substitution between two elements
+        """
         sp = SubstitutionProbability()
         total = 0
+
+        # Sum over all common oxidation states for both elements
         for o1 in el1.common_oxidation_states:
             for o2 in el2.common_oxidation_states:
                 total += sp.prob(self.get_specie(el1, o1), self.get_specie(el2, o2))
         return total
 
     def try_site_mixing(self, driver):
+        """
+        Try allowing site mixing, where a single crystal site might have mixed occupancy between two different elements
+        Only handles pair-wise mixing.
+        :param driver: SHELX driver
+        """
         ins_file = driver.get_res_file()
 
         element_list = [Element(el.capitalize()) for el in ins_file.elements]
         pairs = []
         probability_threshold = 2E-4
+
+        # For all elements in compound, calculate substitution probabilities
+        # If substitution probability is > probability_threshold, then save it to pairs list.
         for i1, i2 in itertools.combinations(range(len(element_list)), 2):
             e1 = element_list[i1]
             e2 = element_list[i2]
@@ -248,42 +282,60 @@ class Optimizer:
             if sp > probability_threshold:
                 pairs.append(([i1, i2], sp))
 
+        # Sort pairs by substitution probability (largest to smallest)
         pairs = [tup[0] for tup in sorted(pairs, key=lambda tup: -tup[1])]
 
-        # only doing pairwise mixing for now, use the BronKerbosch algo to find larger fully connected subgraphs
-        # do better ordering (use bond lengths for prioritization)
-        # for i in range(1, ins_file.crystal_sites[-1].site_number + 1):
         tried = []
-        for i in range(5):
-            mixing_priority = self.site_mixing_priority(driver, ins_file)
-            i = mixing_priority[0]
-            if i in tried:
-                i = mixing_priority[1]
-                if i in tried:
-                    break
-            tried.append(i)
-            local_ins_history = [self.ins_history[-1]]
-            local_r1_history = [self.r1_history[-1]]
-            prev_ins = copy.deepcopy(ins_file)
-            for pair in pairs:
-                ins_file = copy.deepcopy(prev_ins)
-                ins_file.add_site_mixing(i, pair)
-                self.run_iter(driver, ins_file, ins_history=local_ins_history, r1_history=local_r1_history)
-                occupancy_var = float(driver.get_res_file().fvar_vals[-1])
-                if occupancy_var < 0.0 or occupancy_var > 1.0:
-                    local_ins_history = local_ins_history[:-1]
-                    local_r1_history = local_r1_history[:-1]
 
-            best_idx = np.argmin(local_r1_history)
-            ins_file = local_ins_history[best_idx]
-            self.run_iter(driver, ins_file)
+        # Keep adding site mixing until we've already tried adding site mixing at the top priority sites
+        while True:
+            mixing_priority = self.site_mixing_priority(driver, ins_file)
+            # In case of ties, find all top tied priorities
+            top_priority = [priority for priority in mixing_priority if priority == mixing_priority[0]]
+
+            # For each of these top priorities, try site mixing
+            fail = 0
+            for i in top_priority:
+                if i in tried:
+                    fail += 1
+                    continue
+                tried.append(i)
+                local_ins_history = [self.ins_history[-1]]
+                local_r1_history = [self.r1_history[-1]]
+                prev_ins = copy.deepcopy(ins_file)
+                for pair in pairs:
+                    ins_file = copy.deepcopy(prev_ins)
+                    ins_file.add_site_mixing(site_number=i, mixing_element_indices=pair)
+                    self.run_iter(driver, ins_file, ins_history=local_ins_history, r1_history=local_r1_history)
+                    occupancy_var = float(driver.get_res_file().fvar_vals[-1])
+
+                    # If the occupancy isn't really split, undo it
+                    if occupancy_var < 0.02 or occupancy_var > 0.98:
+                        local_ins_history = local_ins_history[:-1]
+                        local_r1_history = local_r1_history[:-1]
+
+                best_idx = np.argmin(local_r1_history)
+                ins_file = local_ins_history[best_idx]
+                self.run_iter(driver, ins_file)
+            if fail == len(top_priority):
+                break
 
 
     def site_mixing_priority(self, driver, ins_file):
+        """
+        Determines priority for adding in site mixing.  Finds most problematic sites based on whether bonds
+        are shorter than expected.
+        :param driver: SHELX driver
+        :param ins_file: SHELX File
+        :return:
+        """
+
+        # Generate CIF file
         ins_file.add_no_arg_command("ACTA")
         driver.run_SHELXTL(ins_file)
         ins_file.remove_command("ACTA")
 
+        # Use pymatgen to get bond distances
         with open(driver.cif_file) as f:
             cif_file = CifParser.from_string(f.read())
 
@@ -295,10 +347,12 @@ class Optimizer:
             distance = float(distance.replace("(", "").replace(")", ""))
             el1 = Element(re.sub('\d', "", a1))
             el2 = Element(re.sub('\d', "", a2))
+            # Calculate amount which bonds are shorter than they are supposed to be
             bond_by_atom[a1].append(distance - (el1.atomic_radius + el2.atomic_radius))
             bond_by_atom[a2].append(distance - (el1.atomic_radius + el2.atomic_radius))
-        # for atom, length_deltas in bond_by_atom.items():
-        #     print atom, sum(sorted(length_deltas)[:4]), sorted(length_deltas)
+
+        # Sort by which bonds are the shortest compared to what we'd expect
+        # Average over deviation from 4 shortest bonds
         sites = sorted(map(lambda tup: (tup[0], sum(sorted(tup[1])[:4])), bond_by_atom.items()), key=lambda tup: tup[1])
         return map(lambda tup: int(re.search("\d+", tup[0]).group(0)), sites)
 
@@ -361,7 +415,7 @@ def test_main():
     #         final_res = os.path.join(ins_path, filename)
     #shutil.copy(os.path.join(ins_path, "raw.hkl"), os.path.join(ins_path, input_prefix + ".hkl"))
     opt = Optimizer()
-    opt.run(path_to_SXTL_dir, ins_path, input_prefix, output_prefix)
+    opt.run(path_to_SXTL_dir, ins_path, input_prefix, output_prefix, use_wine=True)
 
     print opt.r1_history
     # print open(final_res).read()
