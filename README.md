@@ -1,6 +1,7 @@
-# Python library for automated single crystal refinement using Shelx
+# Python library for automated single crystal refinement with Shelx
 
 Authors: E. Antono and J. Ling at Citrine Informatics
+
 Please contact: jling (at) citrine (dot) io with any questions.
 
 This package is intended to be used with the SHELX code suite:
@@ -25,7 +26,7 @@ to install the package.
 
 - Python packages: pymatgen, numpy
 
-- SHELXTL xl.exe and xs.exe files (or xl, xs files for mac)
+- SHELXTL xl.exe and xs.exe files (or xl, xs files for mac).
 If these files are named differently in your distribution, please rename them to match.
 
 - Citrination client:  https://github.com/CitrineInformatics/python-citrination-client
