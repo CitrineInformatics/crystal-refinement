@@ -18,7 +18,7 @@ class Optimizer:
         os.chdir(ins_path)
         shutil.copy(ins_path + input_prefix + ".hkl", ins_path + output_prefix + ".hkl")
         shutil.copy(ins_path + input_prefix + ".ins", ins_path + output_prefix + ".ins")
-        driver = SHELXDriver(ins_path=ins_path, prefix=output_prefix, path_to_SXTL_dir=path_to_SXTL_dir, is_macOS=True)
+        driver = SHELXDriver(ins_path=ins_path, prefix=output_prefix, path_to_SXTL_dir=path_to_SXTL_dir, use_wine=True)
 
         # Run first iteration
         driver.run_SHELXTL_command(cmd="xs")
