@@ -181,7 +181,7 @@ class Optimizer():
             ins_file = copy.deepcopy(prev_ins)
             to_delete = set()
             for a1, a2, distance in bonds:
-                distance = float(distance.replace("(", "").replace(")", ""))
+                distance = float(distance.replace("(", "").replace(")", ""))  # Take off parenthesis
                 el1 = Element(re.sub('\d', "", a1))
                 el2 = Element(re.sub('\d', "", a2))
                 # calculate approxiate ideal bond length
@@ -347,24 +347,28 @@ def main():
 def test_main():
     path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
     ins_path = "/Users/eantono/Documents/project_files/xtal_refinement/Ce4Co2InCe4Ex/"
+    path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal-refinement/shelxtl/SXTL/"
+    ins_path = "/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
+
     input_prefix = "c2mxs1"
+    input_prefix = "absfac1"
     output_prefix = "temp"
 
-    sorted_files = sorted(os.listdir(ins_path), key=lambda filename: os.path.getmtime(os.path.join(ins_path, filename)))
-    final_res = ""
-    for filename in reversed(sorted_files):
-        if output_prefix in filename:
-            continue
-        if ".res" in filename:
-            final_res = os.path.join(ins_path, filename)
-    shutil.copy(os.path.join(ins_path, "raw.hkl"), os.path.join(ins_path, input_prefix + ".hkl"))
+    # sorted_files = sorted(os.listdir(ins_path), key=lambda filename: os.path.getmtime(os.path.join(ins_path, filename)))
+    # final_res = ""
+    # for filename in reversed(sorted_files):
+    #     if output_prefix in filename:
+    #         continue
+    #     if ".res" in filename:
+    #         final_res = os.path.join(ins_path, filename)
+    #shutil.copy(os.path.join(ins_path, "raw.hkl"), os.path.join(ins_path, input_prefix + ".hkl"))
     opt = Optimizer()
     opt.run(path_to_SXTL_dir, ins_path, input_prefix, output_prefix)
 
     print opt.r1_history
-    print open(final_res).read()
-    print "#" * 50
-    print open(os.path.join(ins_path, output_prefix + ".res")).read()
+    # print open(final_res).read()
+    # print "#" * 50
+    # print open(os.path.join(ins_path, output_prefix + ".res")).read()
 
 
 if __name__ == "__main__":
