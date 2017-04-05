@@ -1,6 +1,6 @@
 import re, copy
 from CrystalSite import CrystalSite
-
+import numpy as np
 #TODO JL: REPLACE ALL main() with examples that will run locally
 
 
@@ -179,7 +179,7 @@ class SHELXFile:
         :param site_index: Index (starting at 0) of site
         :param element_index: Index (starting at 1) of element
         """
-        site_index = self.get_crystal_sites_by_number(site_index)[0]
+        site_index = self.get_crystal_sites_by_number(site_index + 1)[0]
         self.crystal_sites[site_index].element = element_index
         self.crystal_sites[site_index].name = self.elements[element_index-1] + str(site_index+1)
 
@@ -187,6 +187,7 @@ class SHELXFile:
         """
         Move the top q peak to a crystal site
         """
+        self.q_peaks[0].site_number = int(np.max(np.asarray([cs.site_number for cs in self.crystal_sites])) + 1.0)
         self.crystal_sites.append(self.q_peaks[0])
         del self.q_peaks[0]
 

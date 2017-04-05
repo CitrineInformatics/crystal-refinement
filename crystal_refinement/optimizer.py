@@ -215,7 +215,7 @@ class Optimizer:
 
         for i, displacement in sorted(enumerate(displacements), key=lambda tup: -tup[1]):
             # don't change occupancy of mixed sites
-            if ins_file.crystal_sites[i].site_number in ins_file.mixed_sites:
+            if ins_file.crystal_sites[i].site_number in ins_file.mixed_site_numbers:
                 continue
             ins_file = driver.get_res_file()
             prev_ins = copy.deepcopy(ins_file)
