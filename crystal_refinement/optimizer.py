@@ -33,6 +33,13 @@ class Optimizer:
         shutil.copy(ins_path + input_prefix + ".ins", ins_path + output_prefix + ".ins")
         driver = SHELXDriver(ins_path=ins_path, prefix=output_prefix, path_to_xl=path_to_xl, path_to_xs=path_to_xs, use_wine=use_wine)
 
+        # Check that the ins file is direct from xprep, without having been run before
+        f = open(output_prefix + ".ins")
+        line_count = 0
+        for line in f:
+            line_count += 1
+        assert line_count < 15, "Error: Must run optimizer directly on output from xprep, without other changes"
+
         # Run first iteration using xs
         driver.run_SHELXTL_command(cmd="xs")
         shutil.copy(ins_path + output_prefix + ".res", ins_path + output_prefix + ".ins")
