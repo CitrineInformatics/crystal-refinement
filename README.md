@@ -34,5 +34,11 @@ You will also need to create an account at citrination.com
 
 # Example
 
-TODO: Add an example/tutorial of use
+To run an example optimization on the ins file in the example folder:  
+cd example  
+python example.py --path-to-xl /path/to/xl.exe --path-to-xs /path/to/xs.exe --ins-path /path/to/insfile  
+--input_prefix input --output_prefix output  
 
+For example, I might run:  
+python example.py -path-to-xl ./xl --path-to-xs ./xs --ins-path ../data/ --input-prefix input --output-prefix output  
+This will generate an output file output.res containing the finalized crystal structure.
