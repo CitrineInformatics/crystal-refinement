@@ -25,21 +25,17 @@ class Optimizer:
         # Read in and run initial SHELXTL file
         ins_file = self.driver.get_ins_file()
         self.run_iter(ins_file)
-        # print "#" * 50
         # Optimization
         if self.r1_history[-1] > 0.1:
             self.identify_sites()
         else:
             self.try_add_q()
             self.try_remove_site()
-        # quit()
+
         self.switch_elements()
         # There is currently an inherent assumption that switch elements will never be called after site mixing, since
         # after site mixing, the indices don't line up anymore
         self.try_site_mixing()
-        # print self.driver.get_ins_file().filetxt
-        # print "#"*50
-        # print self.driver.get_res_file().filetxt
         self.change_occupancy()
         self.try_exti()
         self.try_anisotropy()
@@ -66,18 +62,15 @@ class Optimizer:
     def identify_sites(self):
         ins_file = self.driver.get_res_file()
         shortest_possible_bond = self.get_shortest_bond(ins_file)
-        # print shortest_possible_bond
         for i in range(5):
             to_delete = set()
-            # print "worst: {}".format(sorted(self.get_bonds(ins_file), key=lambda tup: tup[2])[0]), sorted(self.get_bonds(ins_file), key=lambda tup: tup[2])[0][2]/shortest_possible_bond
             for bond in sorted(self.get_bonds(ins_file), key=lambda tup: tup[2]):
                 # Threshold on how short the bonds are
                 if bond[2] / shortest_possible_bond < 0.5:
-                    # print bond, bond[2]/shortest_possible_bond
                     a1_num = int(re.search('\d+', bond[0]).group(0))
                     a2_num = int(re.search('\d+', bond[1]).group(0))
                     to_delete.add(max(a1_num, a2_num))
-            # print "removing sites {}".format(to_delete)
+
             ins_file.remove_sites_by_number(to_delete)
             self.run_iter(ins_file)
             ins_file = self.driver.get_res_file()
@@ -103,7 +96,6 @@ class Optimizer:
             best_elem = np.argmin(self.r1_history[-num_elems:]) + 1
             ins_file.change_element(i, best_elem)
         self.run_iter(ins_file)
-        quit()
 
     def try_anisotropy(self):
         """
@@ -199,18 +191,12 @@ class Optimizer:
                 # calculate approxiate ideal bond length
                 # this should really be covalent radii
                 ideal_distance = utils.get_ideal_bond_length(a1, a2)
-                # if a1 == "Ge5" or a2 == "Ge5":
-                #     print a1, a2, (ideal_distance - distance) / ideal_distance, threshold
-                # if the distance is too small, remove the lower density atom
                 if (ideal_distance - distance) / ideal_distance > threshold:
                     a1_num = int(re.search('\d+', a1).group(0))
                     a2_num = int(re.search('\d+', a2).group(0))
                     to_delete.add(max(a1_num, a2_num))
             ins_file.remove_sites_by_number(to_delete)
             self.run_iter(ins_file)
-            # print to_delete
-            # print self.r1_history[-1], r_before
-            # print "!!!!!"
             if self.r1_history[-1] < r_before * r_penalty or len(to_delete) == 0:
                 break
             threshold *= 1.1
