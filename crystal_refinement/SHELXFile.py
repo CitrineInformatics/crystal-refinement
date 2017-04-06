@@ -1,6 +1,6 @@
 import re, copy
 from CrystalSite import CrystalSite
-
+import numpy as np
 #TODO JL: REPLACE ALL main() with examples that will run locally
 
 
@@ -24,7 +24,7 @@ class SHELXFile:
 
         # crystal site information
         self.crystal_sites = []
-        self.mixed_sites = []
+        self.mixed_site_numbers = []
         self.q_peaks = []
 
         self.r1 = 0.0
@@ -179,6 +179,7 @@ class SHELXFile:
         :param site_index: Index (starting at 0) of site
         :param element_index: Index (starting at 1) of element
         """
+        site_index = self.get_crystal_sites_by_number(site_index + 1)[0]
         self.crystal_sites[site_index].element = element_index
         self.crystal_sites[site_index].name = self.elements[element_index-1] + str(site_index+1)
 
@@ -186,6 +187,7 @@ class SHELXFile:
         """
         Move the top q peak to a crystal site
         """
+        self.q_peaks[0].site_number = int(np.max(np.asarray([cs.site_number for cs in self.crystal_sites])) + 1.0)
         self.crystal_sites.append(self.q_peaks[0])
         del self.q_peaks[0]
 
@@ -195,13 +197,13 @@ class SHELXFile:
         :param site_idx: Index of crystal site to move
         :return:
         """
+        site_idx = self.get_crystal_sites_by_number(site_idx)[0]
         self.q_peaks.insert(0, self.crystal_sites[site_idx])
         del self.crystal_sites[site_idx]
 
     def remove_sites_by_number(self, site_numbers):
         """
         Remove several crystal sites at once
-        # JL QUESTION FOR EA: DO WE WANT TO ADD THESE SITES TO Q PEAKS AT THE SAME TIME?
         :param site_numbers: List of site numbers to remove
         :return:
         """
@@ -230,8 +232,9 @@ class SHELXFile:
         self.commands.append(("EXYZ", [self.elements[i] + str(site_number) for i in mixing_element_indices]))
         self.commands.append(("EADP", [self.elements[i] + str(site_number) for i in mixing_element_indices]))
 
-        # JL QUESTION FOR EA: What if that site already has non-fixed occupancy?  That should be checked before adding to fvar.
-        self.fvar_vals.append(0.5)
+        # If site occupancy is not already variable, add a term to fvar:
+        if self.crystal_sites[site_indices[0]].occupancy_prefix == 1:
+            self.fvar_vals.append(0.5)
 
         mixed_sites = []
         for i, element_idx in enumerate(mixing_element_indices):
@@ -247,7 +250,7 @@ class SHELXFile:
         self.remove_sites_by_number([site_number])  # Remove original crystal site
         self.crystal_sites.extend(mixed_sites)  # Replace with new mixed sites
         self.crystal_sites.sort(key=lambda site: site.site_number)
-        self.mixed_sites.append(site_number)  # JL QUESTION FOR EA: WHAT DOES THIS LINE DO?
+        self.mixed_site_numbers.append(site_number)
 
     def get_crystal_sites_by_number(self, number):
         """

@@ -16,7 +16,6 @@ class SHELXDriver:
         self.use_wine = use_wine
         self.path_to_SXTL_dir = path_to_SXTL_dir  # Path to the directory where xl and xs executables are
         self.directory = ins_path  # Path to initial ins file
-        # self.file_prefix = os.path.join(self.directory + "temp")  # This is where the output gets stored
         self.file_prefix = "temp"
         self.hkl_file = self.directory + prefix + ".hkl"  # These are the inputs
         self.ins_file = self.directory + prefix + ".ins"
