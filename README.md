@@ -13,13 +13,13 @@ automatically detects split occupancy, deficiency, wrong element assignments, an
 # Installation:
 
 Clone this git repo:
-
+```sh
 git clone git@github.com:CitrineInformatics/crystal-refinement.git
-
+```
 Then, use:
-
+```sh
 python setup.py install
-
+```
 to install the package.
 
 # Dependencies:
@@ -35,14 +35,17 @@ You will also need to create an account at citrination.com
 # Example
 
 To run an example optimization on the ins file in the example folder:  
+```sh
 cd example  
 python example.py --path-to-xl /path/to/xl.exe --path-to-xs /path/to/xs.exe --path-to-ins /path/to/insfile  
 --input_prefix input --output_prefix output  
+```
 
 For example, I might run:  
+```sh
 python example.py --path-to-xl ./xl --path-to-xs ./xs --path-to-ins ../data/ --input-prefix input  
 --output-prefix output  
-
+```
 This will generate an output file output.res containing the finalized crystal structure.
 
 *Please note:* 
