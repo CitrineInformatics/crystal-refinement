@@ -64,7 +64,7 @@ class Optimizer:
         self.use_suggested_weights()
 
         print "Done with optimization"
-        print "Final R1 value:", self.r1_history[-1]
+
 
 
     def run_iter(self, ins_file, ins_history=None, r1_history=None):
