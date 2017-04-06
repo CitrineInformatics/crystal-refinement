@@ -1,9 +1,15 @@
 import re, copy
 from CrystalSite import CrystalSite
+import numpy as np
+#TODO JL: REPLACE ALL main() with examples that will run locally
 
-# Parser for .ins and .res SHELLXTL files
-class SHELXTLFile():
+
+class SHELXFile:
+    """
+    This class acts as a parser for .ins and .res SHELX files
+    """
     def __init__(self, filetxt):
+
         # Text that will not be modified, which just needs to be stored in order to re-write the file
         self.filetxt = filetxt
         self.extra_text = ["", "", ""]
@@ -14,24 +20,23 @@ class SHELXTLFile():
 
         # Stores commands as dict.  If command has no value, value is set to None
         self.commands = []
-
         self.fvar_vals = []
 
-        # object to store crystal site information
-        # ex. SM1   4    0.086929    0.000000    0.881287    10.50000    0.00621    0.00453 =
-        #           0.00623    0.00000    0.00199    0.00000
+        # crystal site information
         self.crystal_sites = []
-        self.mixed_sites = []
-
-        # crystal site info (for easier distance calculation and translation between atom sites and q sites)
+        self.mixed_site_numbers = []
         self.q_peaks = []
 
         self.r1 = 0.0
         self.suggested_weight_vals = ""
         self.read(filetxt)
 
-    # do actual file parsing
     def read(self, filetxt):
+        """
+        Do actual parsing
+        :param filetxt: name of file to read in
+        :return the SHELXTL file
+        """
         lines = filetxt.split("\n")
         line_idx = 0
 
@@ -64,7 +69,6 @@ class SHELXTLFile():
         starting_element_keys = ["{}".format(el) for el in self.elements]
         while True:
             line = lines[line_idx]
-
             if re.match("^\s*$", line) is None:
                 split = line.split()
                 key = split[0]
@@ -117,8 +121,11 @@ class SHELXTLFile():
             line_idx += 1
 
 
-    # write ins file (with commands?)
     def get_ins_text(self):
+        """
+        Given a SHELXFile object, it returns the string that can be used to write it out
+        :return: string of ins file
+        """
         res = self.extra_text[0]
         res += "SFAC " + " ".join(self.elements) + "\n"
         res += "UNIT " + " ".join(self.formula_units) + "\n"
@@ -131,18 +138,22 @@ class SHELXTLFile():
         res += "FVAR " + " ".join([str(x) for x in self.fvar_vals]) + "\n"
         res += "\n".join([" ".join(cs.write_line()) for cs in self.crystal_sites]) + "\n"
         res += self.extra_text[2]
-
-
         return res
 
-
     # various editing methods ...
-
     def add_no_arg_command(self, cmd):
+        """
+        Add a command to the ins file
+        :param cmd: command to add
+        """
         if cmd not in map(lambda tup: tup[0], self.commands):
             self.commands.append((cmd, None))
 
     def remove_command(self, cmd):
+        """
+        Remove command
+        :param cmd: command to remove
+        """
         cmd_keys = map(lambda tup: tup[0], self.commands)
         if cmd in cmd_keys:
             indices = [i for i, val in enumerate(cmd_keys) if val is cmd]
@@ -163,56 +174,92 @@ class SHELXTLFile():
         self.remove_command("EXTI")
 
     def change_element(self, site_index, element_index):
+        """
+        Changes the element at a given site
+        :param site_index: Index (starting at 0) of site
+        :param element_index: Index (starting at 1) of element
+        """
+        site_index = self.get_crystal_sites_by_number(site_index + 1)[0]
         self.crystal_sites[site_index].element = element_index
         self.crystal_sites[site_index].name = self.elements[element_index-1] + str(site_index+1)
 
     def move_q_to_crystal(self):
+        """
+        Move the top q peak to a crystal site
+        """
+        self.q_peaks[0].site_number = int(np.max(np.asarray([cs.site_number for cs in self.crystal_sites])) + 1.0)
         self.crystal_sites.append(self.q_peaks[0])
         del self.q_peaks[0]
 
     def move_crystal_to_q(self, site_idx=-1):
+        """
+        Move the crystal site (at site_idx) to a q peak
+        :param site_idx: Index of crystal site to move
+        :return:
+        """
+        site_idx = self.get_crystal_sites_by_number(site_idx)[0]
         self.q_peaks.insert(0, self.crystal_sites[site_idx])
         del self.crystal_sites[site_idx]
 
     def remove_sites_by_number(self, site_numbers):
+        """
+        Remove several crystal sites at once
+        :param site_numbers: List of site numbers to remove
+        :return:
+        """
         self.crystal_sites = [site for site in self.crystal_sites if site.site_number not in site_numbers]
 
     def add_variable_occupancy(self, site_index):
+        """
+        If the site is currently fixed (with prefix=1), then unfix it by changing that prefix
+        and adding an extra term to fvar_vals
+        :param site_index: Index of site where it will unfix the occupancy
+        """
         site = self.crystal_sites[site_index]
         if site.occupancy_prefix == 1:
             self.fvar_vals.append(0.5)
             site.occupancy_prefix = len(self.fvar_vals)
 
     def add_site_mixing(self, site_number, mixing_element_indices):
+        """
+        Adds multiple occupancy of a given crystal site.  Right now, only handles 2-element site mixing.
+        :param site_number: Crystal site index
+        :param mixing_element_indices: Indices of elements mixed at that site
+        :return:
+        """
+        assert len(mixing_element_indices) <= 2, "Error: Can only handle mixing between 2 elements"
         site_indices = self.get_crystal_sites_by_number(site_number)
         self.commands.append(("EXYZ", [self.elements[i] + str(site_number) for i in mixing_element_indices]))
         self.commands.append(("EADP", [self.elements[i] + str(site_number) for i in mixing_element_indices]))
 
-        # this is 2 site mixing only
-        self.fvar_vals.append(0.5)
+        # If site occupancy is not already variable, add a term to fvar:
+        if self.crystal_sites[site_indices[0]].occupancy_prefix == 1:
+            self.fvar_vals.append(0.5)
 
         mixed_sites = []
-
         for i, element_idx in enumerate(mixing_element_indices):
             new_site = copy.deepcopy(self.crystal_sites[site_indices[0]])
             new_site.name = self.elements[element_idx] + str(site_number)
-            new_site.element = element_idx + 1
+            new_site.element = element_idx + 1  # Because elements are 1-indexed
             if i == 0:
                 new_site.occupancy_prefix = len(self.fvar_vals)
             else:
                 new_site.occupancy_prefix = -len(self.fvar_vals)
             mixed_sites.append(new_site)
 
-            # for site in mixed_sites:
-            # print site.occupancy_prefix, site.write_line()
-        self.remove_sites_by_number([site_number])
-        self.crystal_sites.extend(mixed_sites)
+        self.remove_sites_by_number([site_number])  # Remove original crystal site
+        self.crystal_sites.extend(mixed_sites)  # Replace with new mixed sites
         self.crystal_sites.sort(key=lambda site: site.site_number)
-        self.mixed_sites.append(site_number)
+        self.mixed_site_numbers.append(site_number)
 
-    def get_crystal_sites_by_number(self, index):
-        return [i for i, site in enumerate(self.crystal_sites) if site.site_number == index]
-
+    def get_crystal_sites_by_number(self, number):
+        """
+        Returns the index in the crystal_site list corresponding to site_number=number
+        In case of mixed sites, this list could have length > 1
+        :param number: number of site we're looking for
+        :return:
+        """
+        return [i for i, site in enumerate(self.crystal_sites) if site.site_number == number]
 
 def main():
     test_file = "/Users/julialing/Documents/DataScience/crystal_refinement/4-2-1-4_single_crystal/Example_from_slides/7.ins"
@@ -221,7 +268,7 @@ def main():
         text = f.read()
         print text
         print "\n\n" + "~"*50 + "\n\n"
-        file_obj = SHELXTLFile(text)
+        file_obj = SHELXFile(text)
 
         print file_obj.write_ins()
 
