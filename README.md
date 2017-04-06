@@ -40,5 +40,5 @@ python example.py --path-to-xl /path/to/xl.exe --path-to-xs /path/to/xs.exe --in
 --input_prefix input --output_prefix output  
 
 For example, I might run:  
-python example.py -path-to-xl ./xl --path-to-xs ./xs --ins-path ../data/ --input-prefix input --output-prefix output  
+python example.py --path-to-xl ./xl --path-to-xs ./xs --ins-path ../data/ --input-prefix input --output-prefix output  
 This will generate an output file output.res containing the finalized crystal structure.
