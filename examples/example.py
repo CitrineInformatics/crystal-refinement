@@ -13,7 +13,7 @@ parser.add_option("-l", "--path-to-xl",
 parser.add_option("-s", "--path-to-xs",
                   help="Path to xs executable, including executable filename, e.g. path/to/file/xs.exe", dest="xs_path")
 parser.add_option("-w", "--use-wine", help="set to true if running Wine on Mac", default="False", dest="use_wine")
-parser.add_option("-i", "--ins-path",
+parser.add_option("-i", "--path-to-ins",
                   help= "Path to input ins file, without filename, e.g. /path/to/file/", dest="ins_path")
 parser.add_option("-a", "--input-prefix", dest="input_prefix",
                   help="Prefix for input file. e.g. if input file is input.ins, then the prefix is 'input'")
@@ -34,5 +34,7 @@ output_prefix = options.output_prefix
 opt = Optimizer()
 opt.run(path_to_xl=xl_path, path_to_xs=xs_path, ins_path=ins_path, input_prefix=input_prefix,
         output_prefix=output_prefix, use_wine=use_wine)
+
+print "Final R1 value:", opt.r1_history[-1]
 
 
