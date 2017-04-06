@@ -15,10 +15,11 @@ class Optimizer:
         self.ins_history = []  # History of all previous ins files
         self.r1_history = []  # History of all previous R1 values
 
-    def run(self, path_to_SXTL_dir, ins_path, input_prefix, output_prefix, use_wine=False):
+    def run(self, path_to_xl, path_to_xs, ins_path, input_prefix, output_prefix, use_wine=False):
         """
         Method to run the optimization
-        :param path_to_SXTL_dir: path to xl/xs executables
+        :param path_to_xl: path to xl executable
+        :param path_to_xs: path to xs executable
         :param ins_path: path to ins file output by xprep
         :param input_prefix: prefix of ins file (eg for file.ins, the prefix would be "file")
         :param output_prefix: prefix of the result file that the optimizer will output
@@ -29,7 +30,11 @@ class Optimizer:
         shutil.copy(ins_path + input_prefix + ".hkl", ins_path + output_prefix + ".hkl")
         shutil.copy(ins_path + input_prefix + ".ins", ins_path + output_prefix + ".ins")
 
-        self.driver = SHELXDriver(ins_path=ins_path, prefix=output_prefix, path_to_SXTL_dir=path_to_SXTL_dir, use_wine=use_wine)
+        self.driver = SHELXDriver(ins_path=ins_path, prefix=output_prefix, path_to_xl=path_to_xl, path_to_xs=path_to_xs, use_wine=use_wine)
+
+        # Check that the ins file is direct from xprep, without having been run before
+        f = open(output_prefix + ".ins")
+        assert len(f.readlines()) < 15, "Error: Must run optimizer directly on output from xprep, without other changes"
 
         # Run first iteration using xs
         self.driver.run_SHELXTL_command(cmd="xs")
@@ -291,7 +296,9 @@ class Optimizer:
             bonds = self.get_bonds(ins_file)
             mixing_priority = utils.site_mixing_priority(bonds)
             # In case of ties, find all top tied priorities
-            top_priority = [priority for priority in mixing_priority if priority == mixing_priority[0]]
+            top_priority_score = mixing_priority[0][1]
+            top_priority = [priority[0] for priority in mixing_priority if np.abs(priority[1] - top_priority_score) < 0.001]
+
             # For each of these top priorities, try site mixing
             fail = 0
             for i in top_priority:
@@ -366,7 +373,7 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
 
 def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix="temp"):
     opt = Optimizer()
-    opt.run(path_to_SXTL_dir, ins_path, input_prefix, output_prefix, use_wine=True)
+    opt.run(path_to_SXTL_dir+"xl", path_to_SXTL_dir+"xs", ins_path, input_prefix, output_prefix, use_wine=True)
     return opt
 
 

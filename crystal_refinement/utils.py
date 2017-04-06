@@ -66,7 +66,7 @@ def site_mixing_priority(bonds, use_ml_model=False):
     # Sort by which bonds are the shortest compared to what we'd expect
     res = sorted(res, key=lambda tup: tup[1])
     # Get associated site index
-    return map(lambda tup: int(re.search("\d+", tup[0]).group(0)), res)
+    return map(lambda tup: (int(re.search("\d+", tup[0]).group(0)), tup[1]), res)
 
 
 def get_ideal_bond_length(specie_name1, specie_name2, use_ml_model=False):

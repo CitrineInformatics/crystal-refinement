@@ -6,7 +6,7 @@ class SHELXDriver:
     """
     Interface that takes SHELXFile objects and does SHELX things (runs xl, xs, reads in and writes out files)
     """
-    def __init__(self, ins_path, prefix, path_to_SXTL_dir, use_wine=False):
+    def __init__(self, ins_path, prefix, path_to_xl, path_to_xs, use_wine=False):
         """
         :param ins_path: Path to initial ins file (output of xprep)
         :param prefix: Prefix of initial ins file
@@ -14,7 +14,8 @@ class SHELXDriver:
         :param use_wine: Set this flag to true if running windows executables using wine on a mac.
         """
         self.use_wine = use_wine
-        self.path_to_SXTL_dir = path_to_SXTL_dir  # Path to the directory where xl and xs executables are
+        self.path_to_xl = path_to_xl  # Path to the directory where xl executable is
+        self.path_to_xs = path_to_xs
         self.directory = ins_path  # Path to initial ins file
         self.file_prefix = "temp"
         self.hkl_file = self.directory + prefix + ".hkl"  # These are the inputs
@@ -54,13 +55,17 @@ class SHELXDriver:
         self.run_SHELXTL_command(suppress_output=suppress_output, cmd=cmd)
         return self.get_res_file()
 
-    def run_SHELXTL_command(self, cmd="xl.exe", suppress_output=True):
+
+    def run_SHELXTL_command(self, cmd="xl", suppress_output=True):
         """
         Runs the shelx command
         :param cmd: command to call
         :param suppress_output: Do you want it to print out lots of intermediate results?
         """
-        command_args = [os.path.join(self.path_to_SXTL_dir, cmd), self.file_prefix]
+        if cmd == "xs":
+            command_args = [self.path_to_xs, self.file_prefix]
+        else:
+            command_args = [self.path_to_xl, self.file_prefix]
         if self.use_wine:
             command_args = ["wine"] + command_args
         if suppress_output:
@@ -76,7 +81,7 @@ def main():
     ins_path="/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
     prefix = "orig"
     os.chdir(ins_path)
-    driver = SHELXDriver(ins_path=ins_path, prefix=prefix, path_to_SXTL_dir=path_to_SXTL_dir, use_wine=True)
+    driver = SHELXDriver(ins_path=ins_path, prefix=prefix, path_to_xs=path_to_SXTL_dir+"xs", path_to_xl=path_to_SXTL_dir+"xl", use_wine=True)
     file_obj = driver.get_ins_file()
     file_obj.add_anisotropy()
     file_obj.change_element(1, 1)
