@@ -40,5 +40,15 @@ python example.py --path-to-xl /path/to/xl.exe --path-to-xs /path/to/xs.exe --pa
 --input_prefix input --output_prefix output  
 
 For example, I might run:  
-python example.py --path-to-xl ./xl --path-to-xs ./xs --path-to-ins ../data/ --input-prefix input --output-prefix output  
+python example.py --path-to-xl ./xl --path-to-xs ./xs --path-to-ins ../data/ --input-prefix input  
+--output-prefix output  
+
 This will generate an output file output.res containing the finalized crystal structure.
+
+*Please note:* 
+
+--path-to-xl and --path-to-xs should include the name of the executable itself (e.g. xl.exe).  Depending on the source of your SHELX executables, these might be called shelxl and shelxs, xl.exe and xs.exe, or xl and xs.  These should all be equivalent.
+
+--path-to-ins should not include the file name of the ins file.  It should just include the path to the directory.
+
+
