@@ -42,6 +42,10 @@ class SHELXDriver:
             res_text = f.read()
         return SHELXFile(res_text)
 
+    def check_res_file(self):
+        res_written = os.path.getsize(self.res_file) > 0.0
+        return res_written
+
     def run_SHELXTL(self, ins_file_obj, suppress_output=True, cmd="xl.exe"):
         """
         Takes SHELXFile object, runs cmd, then returns resulting SHELXFile object

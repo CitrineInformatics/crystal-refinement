@@ -52,6 +52,7 @@ class Optimizer:
             self.try_add_q()
             self.try_remove_site()
 
+        self.run_iter(ins_file)
         self.switch_elements()
         # There is currently an inherent assumption that switch elements will never be called after site mixing, since
         # after site mixing, the indices don't line up anymore
@@ -129,6 +130,7 @@ class Optimizer:
         # Want to make changes from largest displacement to smallest
         displacements = zip(map((lambda x: x.displacement), ins_file.crystal_sites), map((lambda x: x.site_number), ins_file.crystal_sites))
         displacements.sort(key=lambda x: x[0], reverse=True)
+        print "displacements", displacements
         order = [x[1] - 1 for x in displacements]
         num_elems = len(ins_file.elements)
         for i in order:
@@ -137,9 +139,12 @@ class Optimizer:
                 self.run_iter(ins_file)
 
                 # Check to make sure no negative displacements caused
-                res_file = self.driver.get_res_file()
-                cs = res_file.get_crystal_sites_by_number(i+1)[0]
-                if cs.displacement < 0:
+                if self.driver.check_res_file():
+                    res_file = self.driver.get_res_file()
+                    cs = res_file.crystal_sites[res_file.get_crystal_sites_by_number(i+1)[0]]
+                    if cs.displacement < 0.0:
+                        self.r1_history[-1] = np.infty
+                else:
                     self.r1_history[-1] = np.infty
 
             best_elem = np.argmin(self.r1_history[-num_elems:]) + 1
