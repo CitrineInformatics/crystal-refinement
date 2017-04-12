@@ -330,7 +330,7 @@ class Optimizer:
 def test_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp"):
     subdirs = os.listdir(ins_folder)
     for dirname in subdirs:
-        if dirname[0] != "." and dirname[0] != "!":
+        if dirname[0] != ".":
             print dirname
             test_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix)
 
@@ -379,7 +379,8 @@ def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix
 
 def main():
     path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
-    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/copy/"
+    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/copy/"
+    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
     subdir = "Er4Ru2InGe4"
     # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
     # ins_path = "/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
