@@ -135,6 +135,13 @@ class Optimizer:
             for elem in range(1, num_elems+1):
                 ins_file.change_element(i, elem)
                 self.run_iter(ins_file)
+
+                # Check to make sure no negative displacements caused
+                res_file = self.driver.get_res_file()
+                cs = res_file.get_crystal_sites_by_number(i+1)[0]
+                if cs.displacement < 0:
+                    self.r1_history[-1] = np.infty
+
             best_elem = np.argmin(self.r1_history[-num_elems:]) + 1
             ins_file.change_element(i, best_elem)
         self.run_iter(ins_file)
