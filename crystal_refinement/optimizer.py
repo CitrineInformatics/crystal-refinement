@@ -62,6 +62,7 @@ class Optimizer:
         self.try_anisotropy()
         self.use_suggested_weights()
         self.use_suggested_weights()
+        self.use_suggested_weights()
 
         print "Done with optimization"
 
@@ -332,12 +333,12 @@ class Optimizer:
                 break
 
 
-def test_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp"):
+def test_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp", use_wine=False):
     subdirs = os.listdir(ins_folder)
     for dirname in subdirs:
         if dirname[0] != "." and dirname[0] != "!":
             print dirname
-            test_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix)
+            test_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix, use_wine=use_wine)
 
 
 def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix="temp", print_files=False, use_wine=False):
@@ -386,11 +387,11 @@ def main():
     path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
     ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/copy/"
     subdir = "Er4Ru2InGe4"
-    # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
-    # ins_path = "/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
+    path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
+    ins_folder = "/Users/julialing/Documents/DataScience/crystal_refinement/single_crystal_data/"
 
-    test_all(path_to_SXTL_dir, ins_folder)
-    # test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir + "/"), "absfac1", print_files=True)
+    #test_all(path_to_SXTL_dir, ins_folder, use_wine=True)
+    test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir + "/"), "absfac1", print_files=False, use_wine=True)
     # run_single(path_to_SXTL_dir, os.path.join(ins_path, "work/"), "absfac1")
 
 if __name__ == "__main__":
