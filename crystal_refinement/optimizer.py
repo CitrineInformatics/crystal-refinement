@@ -384,6 +384,21 @@ def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix
     return opt
 
 
+def run_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp"):
+    subdirs = os.listdir(ins_folder)
+    print subdirs
+    for dirname in subdirs:
+        if dirname[0] != ".":
+            print dirname
+            # try:
+            opt = run_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname + "/"), input_prefix, output_prefix)
+            # except Exception, e:
+            #     print "Optimizer failure: {}".format(e)
+            #     print "~" * 50
+            #     continue
+            print "Initial r1: {}".format(opt.r1_history[0])
+            print "Final r1: {}".format(opt.r1_history[-1])
+
 def main():
     path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
     # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/copy/"
@@ -392,7 +407,8 @@ def main():
     # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
     # ins_path = "/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
 
-    test_all(path_to_SXTL_dir, ins_folder, input_prefix="1")
+    # test_all(path_to_SXTL_dir, ins_folder, input_prefix="1")
+    run_all(path_to_SXTL_dir, ins_folder, input_prefix="1")
     # test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir + "/"), "absfac1", print_files=True)
     # run_single(path_to_SXTL_dir, os.path.join(ins_path, "work/"), "absfac1")
 
