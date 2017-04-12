@@ -25,6 +25,7 @@ class Optimizer:
         :param output_prefix: prefix of the result file that the optimizer will output
         :return:
         """
+
         # Copy ins and hkl file to output prefix
         os.chdir(ins_path)
         shutil.copy(os.path.join(ins_path, input_prefix + ".hkl"), os.path.join(ins_path, output_prefix + ".hkl"))
@@ -61,6 +62,10 @@ class Optimizer:
         self.try_anisotropy()
         self.use_suggested_weights()
         self.use_suggested_weights()
+
+        print "Done with optimization"
+
+
 
     def run_iter(self, ins_file, ins_history=None, r1_history=None):
         """
@@ -335,7 +340,7 @@ def test_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix
             test_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix)
 
 
-def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix="temp", print_files=False):
+def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix="temp", print_files=False, use_wine=False):
     try:
         ins_path = os.path.join(dirname, "work") + "/"
         for filename in os.listdir(os.path.join(dirname, "Anton")):
@@ -356,7 +361,8 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
             print "~" * 50
             return
 
-    opt = run_single(path_to_SXTL_dir, ins_path, input_prefix, output_prefix)
+
+    opt = run_single(path_to_SXTL_dir, ins_path, input_prefix, output_prefix, use_wine=use_wine)
     opt_r1 = opt.r1_history[-1]
 
     r1_tol = 2e-4
@@ -374,19 +380,19 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
     print "~" * 50
 
 
-def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix="temp"):
+def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix="temp", use_wine=False):
     opt = Optimizer()
-    opt.run(path_to_SXTL_dir+"xl", path_to_SXTL_dir+"xs", ins_path, input_prefix, output_prefix, use_wine=True)
+    opt.run(os.path.join(path_to_SXTL_dir, "xl"), os.path.join(path_to_SXTL_dir, "xs"), ins_path, input_prefix, output_prefix, use_wine=use_wine)
     return opt
 
 
-def run_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp"):
+def run_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp", use_wine=False):
     subdirs = os.listdir(ins_folder)
     print subdirs
     for dirname in subdirs:
         if dirname[0] != ".":
             print dirname
-            opt = run_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix)
+            opt = run_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix, use_wine)
             print "Initial r1: {}".format(opt.r1_history[0])
             print "Final r1: {}".format(opt.r1_history[-1])
 
@@ -399,7 +405,7 @@ def main():
     # ins_path = "/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
 
     # test_all(path_to_SXTL_dir, ins_folder)
-    run_all(path_to_SXTL_dir, ins_folder, input_prefix="1")
+    run_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True)
     # test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir + "/"), "absfac1", print_files=True)
     # run_single(path_to_SXTL_dir, os.path.join(ins_path, "work/"), "absfac1")
 

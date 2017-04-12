@@ -17,7 +17,7 @@ class SHELXDriver:
         self.path_to_xl = path_to_xl  # Path to the directory where xl executable is
         self.path_to_xs = path_to_xs
         self.directory = ins_path  # Path to initial ins file
-        self.file_prefix = "temp"
+        self.file_prefix = prefix
         self.hkl_file = os.path.join(self.directory, prefix + ".hkl")  # These are the inputs
         self.ins_file = os.path.join(self.directory, prefix + ".ins")
         self.res_file = os.path.join(self.directory, prefix + ".res")
