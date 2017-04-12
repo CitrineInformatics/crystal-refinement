@@ -330,7 +330,7 @@ class Optimizer:
 def test_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp"):
     subdirs = os.listdir(ins_folder)
     for dirname in subdirs:
-        if dirname[0] != ".":
+        if dirname[0] != "." and dirname[0] != "!":
             print dirname
             test_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix)
 
@@ -345,9 +345,16 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
             if ".res" in filename:
                 final_res = os.path.join(dirname, "Anton", filename)
     except Exception:
-        print "File structure failure"
-        print "~" * 50
-        return
+        try:
+            ins_path = dirname + "/"
+            open(os.path.join(dirname, "1.hkl"))
+            open(os.path.join(dirname, "1.ins"))
+            final_res = os.path.join(dirname, "result.res")
+            open(final_res)
+        except Exception:
+            print "File structure failure"
+            print "~" * 50
+            return
 
     # try:
     opt = run_single(path_to_SXTL_dir, ins_path, input_prefix, output_prefix)
@@ -385,7 +392,7 @@ def main():
     # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
     # ins_path = "/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
 
-    test_all(path_to_SXTL_dir, ins_folder)
+    test_all(path_to_SXTL_dir, ins_folder, input_prefix="1")
     # test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir + "/"), "absfac1", print_files=True)
     # run_single(path_to_SXTL_dir, os.path.join(ins_path, "work/"), "absfac1")
 
