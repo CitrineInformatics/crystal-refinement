@@ -18,10 +18,10 @@ class SHELXDriver:
         self.path_to_xs = path_to_xs
         self.directory = ins_path  # Path to initial ins file
         self.file_prefix = "temp"
-        self.hkl_file = self.directory + prefix + ".hkl"  # These are the inputs
-        self.ins_file = self.directory + prefix + ".ins"
-        self.res_file = self.directory + prefix + ".res"
-        self.cif_file = self.directory + prefix + ".cif"
+        self.hkl_file = os.path.join(self.directory, prefix + ".hkl")  # These are the inputs
+        self.ins_file = os.path.join(self.directory, prefix + ".ins")
+        self.res_file = os.path.join(self.directory, prefix + ".res")
+        self.cif_file = os.path.join(self.directory, prefix + ".cif")
         os.chdir(self.directory)
 
     def get_ins_file(self):

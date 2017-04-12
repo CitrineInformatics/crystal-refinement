@@ -27,8 +27,8 @@ class Optimizer:
         """
         # Copy ins and hkl file to output prefix
         os.chdir(ins_path)
-        shutil.copy(ins_path + input_prefix + ".hkl", ins_path + output_prefix + ".hkl")
-        shutil.copy(ins_path + input_prefix + ".ins", ins_path + output_prefix + ".ins")
+        shutil.copy(os.path.join(ins_path, input_prefix + ".hkl"), os.path.join(ins_path, output_prefix + ".hkl"))
+        shutil.copy(os.path.join(ins_path, input_prefix + ".ins"), os.path.join(ins_path, output_prefix + ".ins"))
 
         self.driver = SHELXDriver(ins_path=ins_path, prefix=output_prefix, path_to_xl=path_to_xl, path_to_xs=path_to_xs, use_wine=use_wine)
 
@@ -38,7 +38,7 @@ class Optimizer:
 
         # Run first iteration using xs
         self.driver.run_SHELXTL_command(cmd="xs")
-        shutil.copy(ins_path + output_prefix + ".res", ins_path + output_prefix + ".ins")
+        shutil.copy(os.path.join(ins_path, output_prefix + ".res"), os.path.join(ins_path, output_prefix + ".ins"))
 
         # Read in and run initial SHELXTL file
         ins_file = self.driver.get_ins_file()
@@ -356,13 +356,9 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
             print "~" * 50
             return
 
-    # try:
     opt = run_single(path_to_SXTL_dir, ins_path, input_prefix, output_prefix)
     opt_r1 = opt.r1_history[-1]
-    # except Exception, e:
-    #     print "Optimizer failure: {}".format(e)
-    #     print "~" * 50
-    #     return
+
     r1_tol = 2e-4
     anton_r1 = float(re.search("REM R1 =  (\d\.\d+)", open(final_res).read()).group(1))
     print "Initial r1 = {}".format(opt.r1_history[0])
@@ -390,12 +386,7 @@ def run_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix=
     for dirname in subdirs:
         if dirname[0] != ".":
             print dirname
-            # try:
-            opt = run_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname + "/"), input_prefix, output_prefix)
-            # except Exception, e:
-            #     print "Optimizer failure: {}".format(e)
-            #     print "~" * 50
-            #     continue
+            opt = run_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix)
             print "Initial r1: {}".format(opt.r1_history[0])
             print "Final r1: {}".format(opt.r1_history[-1])
 
@@ -407,7 +398,7 @@ def main():
     # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
     # ins_path = "/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
 
-    # test_all(path_to_SXTL_dir, ins_folder, input_prefix="1")
+    # test_all(path_to_SXTL_dir, ins_folder)
     run_all(path_to_SXTL_dir, ins_folder, input_prefix="1")
     # test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir + "/"), "absfac1", print_files=True)
     # run_single(path_to_SXTL_dir, os.path.join(ins_path, "work/"), "absfac1")
