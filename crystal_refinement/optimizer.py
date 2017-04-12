@@ -127,8 +127,9 @@ class Optimizer:
         ins_file = self.driver.get_res_file()
 
         # Want to make changes from largest displacement to smallest
-        displacements = map((lambda x: x.displacement), ins_file.crystal_sites)
-        order = (np.argsort(np.asarray(displacements))[::-1]).tolist()
+        displacements = zip(map((lambda x: x.displacement), ins_file.crystal_sites), map((lambda x: x.site_number), ins_file.crystal_sites))
+        displacements.sort(key=lambda x: x[0], reverse=True)
+        order = [x[1] - 1 for x in displacements]
         num_elems = len(ins_file.elements)
         for i in order:
             for elem in range(1, num_elems+1):
@@ -397,12 +398,12 @@ def run_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix=
             print "Final r1: {}".format(opt.r1_history[-1])
 
 def main():
-    path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
+    # path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
     # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/copy/"
-    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
-    subdir = "Er4Ru2InGe4"
+    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
+    # subdir = "Er4Ru2InGe4"
     path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
-    ins_folder = "/Users/julialing/Documents/DataScience/crystal_refinement/single_crystal_data/"
+    ins_folder = "/Users/julialing/Documents/DataScience/crystal_refinement/single_crystal_data/unseen"
 
     # test_all(path_to_SXTL_dir, ins_folder)
     run_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True)
