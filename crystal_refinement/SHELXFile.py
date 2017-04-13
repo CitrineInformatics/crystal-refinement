@@ -60,7 +60,7 @@ class SHELXFile:
             line = lines[line_idx]
             self.extra_text[self.extra_text_section] += line + "\n"
             line_idx += 1
-            if "PLAN" in line:
+            if "SIZE" in line:
                 break
 
         line_idx += 1
@@ -179,9 +179,9 @@ class SHELXFile:
         :param site_index: Index (starting at 0) of site
         :param element_index: Index (starting at 1) of element
         """
-        site_index = self.get_crystal_sites_by_number(site_index + 1)[0]
-        self.crystal_sites[site_index].element = element_index
-        self.crystal_sites[site_index].name = self.elements[element_index-1] + str(site_index+1)
+        site = self.get_crystal_sites_by_number(site_index + 1)[0]
+        self.crystal_sites[site].element = element_index
+        self.crystal_sites[site].name = self.elements[element_index-1] + str(site_index+1)
 
     def move_q_to_crystal(self):
         """
