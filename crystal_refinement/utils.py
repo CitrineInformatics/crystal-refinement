@@ -44,8 +44,8 @@ def get_bond_score(bond, use_ml_model=False):
     :return: bond length - ideal bond length
     """
     ideal_bond_length = get_ideal_bond_length(bond[0], bond[1], use_ml_model)
-    # Calculate amount which bonds are shorter than they are supposed to be
-    return bond[2] - ideal_bond_length
+    # Calculate amount which bonds deviate from the expected bond length
+    return -abs(bond[2] - ideal_bond_length)
 
 
 def site_mixing_priority(bonds, use_ml_model=False):
