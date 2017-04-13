@@ -12,7 +12,7 @@ class Optimizer:
     """
     Class for performing single crystal refinement
     """
-    def __init__(self, r1_similarity_threshold=0.002, occupancy_threshold=0.02, r1_threshold=0.1,
+    def __init__(self, r1_similarity_threshold=0.0025, occupancy_threshold=0.02, r1_threshold=0.1,
                  least_squares_iterations=10, use_ml_model=False):
         """
         :param r1_similarity_threshold: If r1 scores for multiple options are within this similarity threshold, the
@@ -28,7 +28,7 @@ class Optimizer:
         self.least_squares_iterations = least_squares_iterations
         self.use_ml_model = use_ml_model
 
-    def run(self, path_to_xl, path_to_xs, ins_path, input_prefix, output_prefix, use_wine=False):
+    def run(self, path_to_xl, path_to_xs, ins_path, input_prefix, output_prefix, use_wine=False, annotate_graph=False):
         """
         Method to run the optimization
         :param path_to_xl: path to xl executable
@@ -43,7 +43,7 @@ class Optimizer:
         os.chdir(ins_path)
         shutil.copy(os.path.join(ins_path, input_prefix + ".hkl"), os.path.join(ins_path, output_prefix + ".hkl"))
         shutil.copy(os.path.join(ins_path, input_prefix + ".ins"), os.path.join(ins_path, output_prefix + ".ins"))
-
+        self.annotate_graph = annotate_graph
         self.driver = SHELXDriver(ins_path=ins_path, prefix=output_prefix, path_to_xl=path_to_xl, path_to_xs=path_to_xs, use_wine=use_wine)
 
         # Check that the ins file is direct from xprep, without having been run before
@@ -136,7 +136,9 @@ class Optimizer:
         Try adding q peaks to main crystal sites if it decreases R value
         :return:
         """
-
+        annotation = None
+        if self.annotate_graph:
+            annotation = "Added q peak"
         ins_file = initial.get_res()
         # This threshold could be scaled based on the potential atoms
         if ins_file.q_peaks[0].electron_density > 50:
@@ -146,7 +148,7 @@ class Optimizer:
             iterations = []
             for elem in range(1, num_elems + 1):
                 ins_file.change_element(len(ins_file.crystal_sites) - 1, elem)
-                iteration = self.history.run_iter(ins_file, initial)
+                iteration = self.history.run_iter(ins_file, initial, annotation)
                 if iteration is not None:
                     iterations.append(iteration)
             iterations.sort(key=lambda i: i.r1)
@@ -184,7 +186,10 @@ class Optimizer:
             if len(to_delete) == 0:
                 break
             ins_file.remove_sites_by_number(to_delete)
-            cur_iter = self.history.run_iter(ins_file, initial)
+            if self.annotate_graph:
+                cur_iter = self.history.run_iter(ins_file, initial, "Removed {} site(s)".format(len(to_delete)))
+            else:
+                cur_iter = self.history.run_iter(ins_file, initial)
             if cur_iter is not None and cur_iter.r1 < initial.r1 * r_penalty:
                 self.history.save(cur_iter)
                 break
@@ -204,7 +209,12 @@ class Optimizer:
                 iterations = []
                 for elem in range(1, num_elems+1):
                     ins_file.change_element(i, elem)
-                    iteration = self.history.run_iter(ins_file, prev_iter)
+                    if self.annotate_graph:
+                        prev = prev_iter.res_file.crystal_sites[i].name
+                        cur = ins_file.crystal_sites[i].name
+                        iteration = self.history.run_iter(ins_file, prev_iter, "Changed {} to {}".format(prev, cur))
+                    else:
+                        iteration = self.history.run_iter(ins_file, prev_iter)
                     if iteration is not None:
                         iterations.append(iteration)
                 iterations.sort(key=lambda i: i.r1)
@@ -232,7 +242,11 @@ class Optimizer:
                     break
 
                 ins_file.add_variable_occupancy(i)
-                iteration = self.history.run_iter(ins_file, initial)
+                if self.annotate_graph:
+                    site = ins_file.crystal_sites[i].name
+                    iteration = self.history.run_iter(ins_file, initial, "Added variable occupancy for {}".format(site))
+                else:
+                    iteration = self.history.run_iter(ins_file, initial)
 
                 # If changing the occupancy decreased r1, decreased the displacement, and resulted in an occupancy
                 # that satisfies the threshold, add it to the history
@@ -275,7 +289,7 @@ class Optimizer:
         mixing_priority = utils.site_mixing_priority(bonds)
         # In case of ties, find all top tied priorities
         top_priority_score = mixing_priority[0][1]
-        top_priority = [priority[0] for priority in mixing_priority if np.abs(priority[1] - top_priority_score) < 0.5]
+        top_priority = [priority[0] for priority in mixing_priority if priority[1] - top_priority_score < 0.5]
 
         # For each of these top priorities, try site mixing
         if all([i in tried for i in top_priority]):
@@ -289,7 +303,11 @@ class Optimizer:
                 for pair in pairs:
                     ins_file = prev_iter.get_res()
                     ins_file.add_site_mixing(site_number=i, mixing_element_indices=pair)
-                    iteration = self.history.run_iter(ins_file, prev_iter)
+                    if self.annotate_graph:
+                        mix = "{} and {}".format(ins_file.elements[pair[0]], ins_file.elements[pair[1]])
+                        iteration = self.history.run_iter(ins_file, prev_iter, "Mixing {} on site {}".format(mix, i))
+                    else:
+                        iteration = self.history.run_iter(ins_file, prev_iter)
                     if iteration is not None:
                         occupancy_var = float(iteration.res_file.fvar_vals[-1])
                         # Only include occupancies that are actually split
@@ -317,7 +335,10 @@ class Optimizer:
 
         #  Try with anisotropy
         ins_file.add_anisotropy()
-        iteration = self.history.run_iter(ins_file, initial)
+        if self.annotate_graph:
+            iteration = self.history.run_iter(ins_file, initial, "Added anisotropy")
+        else:
+            iteration = self.history.run_iter(ins_file, initial)
         #  If anisotropy helped, add it to the history
         if iteration is not None and iteration.r1 < initial.r1:
             self.history.save(iteration)
@@ -331,7 +352,10 @@ class Optimizer:
 
         #  Try with extinguishing
         ins_file.add_exti()
-        iteration = self.history.run_iter(ins_file, initial)
+        if self.annotate_graph:
+            iteration = self.history.run_iter(ins_file, initial, "Added extinction")
+        else:
+            iteration = self.history.run_iter(ins_file, initial)
 
         #  If exti helped, add it to the history
         if iteration is not None and iteration.r1 < initial.r1:
@@ -347,7 +371,10 @@ class Optimizer:
         #  Try with extinguishing
         ins_file.remove_command("WGHT")
         ins_file.commands.append(("WGHT", ins_file.suggested_weight_vals))
-        iteration = self.history.run_iter(ins_file, initial)
+        if self.annotate_graph:
+            iteration = self.history.run_iter(ins_file, initial, "Used suggested weights")
+        else:
+            iteration = self.history.run_iter(ins_file, initial)
 
         #  If exti helped, add it to the history
         if iteration is not None and iteration.r1 < initial.r1:
@@ -357,15 +384,18 @@ class Optimizer:
 ########################################################################################################################
 
 
-def test_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp", use_wine=False):
+def test_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp", use_wine=False,
+             generate_graph=False, annotate_graph=False, graph_path=""):
     subdirs = os.listdir(ins_folder)
     for dirname in subdirs:
         if dirname[0] != ".":
             print dirname
-            test_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix, use_wine=use_wine)
+            test_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix, use_wine,
+                        generate_graph, annotate_graph, graph_path)
 
 
-def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix="temp", print_files=False, use_wine=False):
+def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix="temp", print_files=False, use_wine=False,
+                generate_graph=False, annotate_graph=False, graph_path=""):
     try:
         ins_path = os.path.join(dirname, "work") + "/"
         for filename in os.listdir(os.path.join(dirname, "Anton")):
@@ -387,7 +417,8 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
             return
 
 
-    opt = run_single(path_to_SXTL_dir, ins_path, input_prefix, output_prefix, use_wine=use_wine)
+    opt = run_single(path_to_SXTL_dir, ins_path, input_prefix, output_prefix, use_wine,
+                     generate_graph, annotate_graph, graph_path)
 
     best_history = opt.history.get_best_history()
 
@@ -405,22 +436,28 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
         print "Reference final result:"
         print open(final_res).read()
     print "~" * 50
-    opt.history.head.generate_graph("/Users/eantono/Documents/src/xtal_refinement/output/test")
 
 
-def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix="temp", use_wine=False):
+def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix="temp", use_wine=False,
+               generate_graph=False, annotate_graph=False, graph_path=""):
     opt = Optimizer()
-    opt.run(os.path.join(path_to_SXTL_dir, "xl.exe"), os.path.join(path_to_SXTL_dir, "xs.exe"), ins_path, input_prefix, output_prefix, use_wine=use_wine)
+    opt.run(os.path.join(path_to_SXTL_dir, "xl.exe"), os.path.join(path_to_SXTL_dir, "xs.exe"), ins_path, input_prefix, output_prefix, use_wine=use_wine,
+            annotate_graph=annotate_graph)
+    if generate_graph:
+        print os.path.join(graph_path, os.path.basename(ins_path))
+        opt.history.head.generate_graph(os.path.join(graph_path, os.path.basename(ins_path)))
     return opt
 
 
-def run_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp", use_wine=False):
+def run_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp", use_wine=False,
+            generate_graph=False, annotate_graph=False, graph_path=""):
     subdirs = os.listdir(ins_folder)
     print subdirs
     for dirname in subdirs:
         if dirname[0] != ".":
             print dirname
-            opt = run_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix, use_wine)
+            opt = run_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix, use_wine,
+                             generate_graph, annotate_graph, graph_path)
             best_history = opt.history.get_best_history()
             print len(opt.history.leaves), "path(s) tried"
             print "Initial r1: {}".format(best_history[0].r1)
@@ -428,16 +465,21 @@ def run_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix=
 
 def main():
     path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
-    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/4-2-1-4 INS and HKL files"
-    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
+    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/4-2-1-4 INS and HKL files"
+    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
     subdir = "!solid_solution-Nd4Mn2CdSi2.5Ge1.5"
+    graph_output_path = "/Users/eantono/Documents/src/xtal_refinement/output"
     # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
     # ins_folder = "/Users/julialing/Documents/DataScience/crystal_refinement/single_crystal_data/"
 
-    # test_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True)
-    test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", print_files=True, use_wine=True)
-    # run_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True)
-    # run_single(path_to_SXTL_dir, os.path.join(ins_path, "work/"), "absfac1")
+    # test_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True,
+    #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
+    # test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", print_files=True, use_wine=True,
+    #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
+    run_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True,
+      generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
+    # run_single(path_to_SXTL_dir, os.path.join(ins_path, "work/"), "absfac1",
+    #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
 
 if __name__ == "__main__":
     main()
