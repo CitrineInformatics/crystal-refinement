@@ -25,10 +25,11 @@ class Optimizer:
         :param output_prefix: prefix of the result file that the optimizer will output
         :return:
         """
+
         # Copy ins and hkl file to output prefix
         os.chdir(ins_path)
-        shutil.copy(ins_path + input_prefix + ".hkl", ins_path + output_prefix + ".hkl")
-        shutil.copy(ins_path + input_prefix + ".ins", ins_path + output_prefix + ".ins")
+        shutil.copy(os.path.join(ins_path, input_prefix + ".hkl"), os.path.join(ins_path, output_prefix + ".hkl"))
+        shutil.copy(os.path.join(ins_path, input_prefix + ".ins"), os.path.join(ins_path, output_prefix + ".ins"))
 
         self.driver = SHELXDriver(ins_path=ins_path, prefix=output_prefix, path_to_xl=path_to_xl, path_to_xs=path_to_xs, use_wine=use_wine)
 
@@ -38,7 +39,7 @@ class Optimizer:
 
         # Run first iteration using xs
         self.driver.run_SHELXTL_command(cmd="xs")
-        shutil.copy(ins_path + output_prefix + ".res", ins_path + output_prefix + ".ins")
+        shutil.copy(os.path.join(ins_path, output_prefix + ".res"), os.path.join(ins_path, output_prefix + ".ins"))
 
         # Read in and run initial SHELXTL file
         ins_file = self.driver.get_ins_file()
@@ -61,6 +62,10 @@ class Optimizer:
         self.try_anisotropy()
         self.use_suggested_weights()
         self.use_suggested_weights()
+
+        print "Done with optimization"
+
+
 
     def run_iter(self, ins_file, ins_history=None, r1_history=None):
         """
@@ -335,7 +340,7 @@ def test_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix
             test_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix)
 
 
-def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix="temp", print_files=False):
+def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix="temp", print_files=False, use_wine=False):
     try:
         ins_path = os.path.join(dirname, "work") + "/"
         for filename in os.listdir(os.path.join(dirname, "Anton")):
@@ -345,17 +350,21 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
             if ".res" in filename:
                 final_res = os.path.join(dirname, "Anton", filename)
     except Exception:
-        print "File structure failure"
-        print "~" * 50
-        return
+        try:
+            ins_path = dirname + "/"
+            open(os.path.join(dirname, "1.hkl"))
+            open(os.path.join(dirname, "1.ins"))
+            final_res = os.path.join(dirname, "result.res")
+            open(final_res)
+        except Exception:
+            print "File structure failure"
+            print "~" * 50
+            return
 
-    # try:
-    opt = run_single(path_to_SXTL_dir, ins_path, input_prefix, output_prefix)
+
+    opt = run_single(path_to_SXTL_dir, ins_path, input_prefix, output_prefix, use_wine=use_wine)
     opt_r1 = opt.r1_history[-1]
-    # except Exception, e:
-    #     print "Optimizer failure: {}".format(e)
-    #     print "~" * 50
-    #     return
+
     r1_tol = 2e-4
     anton_r1 = float(re.search("REM R1 =  (\d\.\d+)", open(final_res).read()).group(1))
     print "Initial r1 = {}".format(opt.r1_history[0])
@@ -371,20 +380,32 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
     print "~" * 50
 
 
-def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix="temp"):
+def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix="temp", use_wine=False):
     opt = Optimizer()
-    opt.run(path_to_SXTL_dir+"xl", path_to_SXTL_dir+"xs", ins_path, input_prefix, output_prefix, use_wine=True)
+    opt.run(os.path.join(path_to_SXTL_dir, "xl"), os.path.join(path_to_SXTL_dir, "xs"), ins_path, input_prefix, output_prefix, use_wine=use_wine)
     return opt
 
 
+def run_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp", use_wine=False):
+    subdirs = os.listdir(ins_folder)
+    print subdirs
+    for dirname in subdirs:
+        if dirname[0] != ".":
+            print dirname
+            opt = run_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix, use_wine)
+            print "Initial r1: {}".format(opt.r1_history[0])
+            print "Final r1: {}".format(opt.r1_history[-1])
+
 def main():
     path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
-    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/copy/"
+    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/copy/"
+    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
     subdir = "Er4Ru2InGe4"
     # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
     # ins_path = "/Users/julialing/Documents/DataScience/crystal_refinement/temp/"
 
-    test_all(path_to_SXTL_dir, ins_folder)
+    # test_all(path_to_SXTL_dir, ins_folder)
+    run_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True)
     # test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir + "/"), "absfac1", print_files=True)
     # run_single(path_to_SXTL_dir, os.path.join(ins_path, "work/"), "absfac1")
 
