@@ -87,9 +87,6 @@ class Optimizer:
         return zip(cif_dict["_geom_bond_atom_site_label_1"], cif_dict["_geom_bond_atom_site_label_2"],
                    [float(x.replace("(", "").replace(")", "")) for x in cif_dict["_geom_bond_distance"]])
 
-    def get_shortest_bond(self, ins_file):
-        return sorted([utils.get_ideal_bond_length(el.capitalize(), el.capitalize()) for el in ins_file.elements])[0]
-
     def identify_sites(self, initial):
         if initial.r1 > self.r1_threshold:
             self.identify_sites_by_bond_length(initial)
@@ -120,6 +117,60 @@ class Optimizer:
             ins_file.remove_sites_by_number(to_delete)
             prev_iteration = self.history.run_and_save(ins_file, prev_iteration)
 
+    def switch_elements(self, initial):
+        ins_file = initial.get_res()
+
+        # Want to make changes from largest displacement to smallest
+        # displacements = map((lambda x: x.displacement), ins_file.crystal_sites)
+        # order = (np.argsort(np.asarray(displacements))[::-1]).tolist()
+        sorted_sites = sorted(ins_file.crystal_sites, key=lambda s: -s.displacement)
+        order = [s.site_number - 1 for s in sorted_sites]
+        num_elems = len(ins_file.elements)
+        # print "\n".join([" ".join(s.write_line()) for s in initial.ins_file.crystal_sites])
+        for i in order:
+            for prev_iter in initial.get_leaves():
+                ins_file = prev_iter.get_res()
+                iterations = []
+                for elem in range(1, num_elems+1):
+                    ins_file.change_element(i, elem)
+                    iteration = self.history.run_iter(ins_file, prev_iter)
+                    if iteration is not None:
+                        iterations.append(iteration)
+                iterations.sort(key=lambda i: i.r1)
+                for iteration in iterations:
+                    if iteration.r1 - iterations[0].r1 < self.r1_similarity_threshold:
+                        self.history.save(iteration)
+
+    def try_anisotropy(self, initial):
+        """
+        Test if adding anisotropy reduces R1 value.  If it does, do so.
+        :return:
+        """
+
+        ins_file = initial.get_res()
+
+        #  Try with anisotropy
+        ins_file.add_anisotropy()
+        iteration = self.history.run_iter(ins_file, initial)
+        #  If anisotropy helped, add it to the history
+        if iteration is not None and iteration.r1 < initial.r1:
+            self.history.save(iteration)
+
+    def try_exti(self, initial):
+        """
+        Test if adding extinguishing reduces R1 value.  If it does, do so.
+        :return:
+        """
+        ins_file = initial.get_res()
+
+        #  Try with extinguishing
+        ins_file.add_exti()
+        iteration = self.history.run_iter(ins_file, initial)
+
+        #  If exti helped, add it to the history
+        if iteration is not None and iteration.r1 < initial.r1:
+            self.history.save(iteration)
+
     def try_add_q(self, initial):
         """
         Try adding q peaks to main crystal sites if it decreases R value
@@ -146,6 +197,22 @@ class Optimizer:
                 for leaf in initial.get_leaves():
                     #   If adding one peak helped, recursively try adding another peak until it stops helping
                     self.try_add_q(leaf)
+
+    def use_suggested_weights(self, initial):
+        """
+        Stop re-initializing weights each time--use previously suggested weights
+        :return:
+        """
+        ins_file = initial.get_res()
+
+        #  Try with extinguishing
+        ins_file.remove_command("WGHT")
+        ins_file.commands.append(("WGHT", ins_file.suggested_weight_vals))
+        iteration = self.history.run_iter(ins_file, initial)
+
+        #  If exti helped, add it to the history
+        if iteration is not None and iteration.r1 < initial.r1:
+            self.history.save(iteration)
 
     def try_remove_site(self, initial):
         """
@@ -179,29 +246,9 @@ class Optimizer:
                 break
             threshold *= 1.1
 
-    def switch_elements(self, initial):
-        ins_file = initial.get_res()
+    def get_shortest_bond(self, ins_file):
+        return sorted([utils.get_ideal_bond_length(el.capitalize(), el.capitalize()) for el in ins_file.elements])[0]
 
-        # Want to make changes from largest displacement to smallest
-        # displacements = map((lambda x: x.displacement), ins_file.crystal_sites)
-        # order = (np.argsort(np.asarray(displacements))[::-1]).tolist()
-        sorted_sites = sorted(ins_file.crystal_sites, key=lambda s: -s.displacement)
-        order = [s.site_number - 1 for s in sorted_sites]
-        num_elems = len(ins_file.elements)
-        # print "\n".join([" ".join(s.write_line()) for s in initial.ins_file.crystal_sites])
-        for i in order:
-            for prev_iter in initial.get_leaves():
-                ins_file = prev_iter.get_res()
-                iterations = []
-                for elem in range(1, num_elems+1):
-                    ins_file.change_element(i, elem)
-                    iteration = self.history.run_iter(ins_file, prev_iter)
-                    if iteration is not None:
-                        iterations.append(iteration)
-                iterations.sort(key=lambda i: i.r1)
-                for iteration in iterations:
-                    if iteration.r1 - iterations[0].r1 < self.r1_similarity_threshold:
-                        self.history.save(iteration)
 
     def change_occupancy(self, initial):
         ins_file = initial.get_res()
@@ -294,53 +341,6 @@ class Optimizer:
                     self.history.save(iterations[0])
                 for leaf in prev_iter.get_leaves():
                     self.do_site_mixing(leaf, tried.union(set(top_priority)), pairs)
-
-
-    def try_anisotropy(self, initial):
-        """
-        Test if adding anisotropy reduces R1 value.  If it does, do so.
-        :return:
-        """
-
-        ins_file = initial.get_res()
-
-        #  Try with anisotropy
-        ins_file.add_anisotropy()
-        iteration = self.history.run_iter(ins_file, initial)
-        #  If anisotropy helped, add it to the history
-        if iteration is not None and iteration.r1 < initial.r1:
-            self.history.save(iteration)
-
-    def try_exti(self, initial):
-        """
-        Test if adding extinguishing reduces R1 value.  If it does, do so.
-        :return:
-        """
-        ins_file = initial.get_res()
-
-        #  Try with extinguishing
-        ins_file.add_exti()
-        iteration = self.history.run_iter(ins_file, initial)
-
-        #  If exti helped, add it to the history
-        if iteration is not None and iteration.r1 < initial.r1:
-            self.history.save(iteration)
-
-    def use_suggested_weights(self, initial):
-        """
-        Stop re-initializing weights each time--use previously suggested weights
-        :return:
-        """
-        ins_file = initial.get_res()
-
-        #  Try with extinguishing
-        ins_file.remove_command("WGHT")
-        ins_file.commands.append(("WGHT", ins_file.suggested_weight_vals))
-        iteration = self.history.run_iter(ins_file, initial)
-
-        #  If exti helped, add it to the history
-        if iteration is not None and iteration.r1 < initial.r1:
-            self.history.save(iteration)
 
 
 ########################################################################################################################
