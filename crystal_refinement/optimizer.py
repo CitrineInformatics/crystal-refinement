@@ -137,12 +137,12 @@ class Optimizer:
             ins_file = self.driver.get_res_file()
 
         # Also remove site if displacement is crazy high
-        displacements = [x.displacement for x in ins_file.crystal_sites]
-        site_numbers = [x.site_number for x in ins_file.crystal_sites]
-        for i, d in enumerate(displacements):
-            if d > 1.0:
-                to_delete.add(site_numbers[i])
-        ins_file.remove_sites_by_number(to_delete)
+        # displacements = [x.displacement for x in ins_file.crystal_sites]
+        # site_numbers = [x.site_number for x in ins_file.crystal_sites]
+        # for i, d in enumerate(displacements):
+        #     if d > 1.0:
+        #         to_delete.add(site_numbers[i])
+        # ins_file.remove_sites_by_number(to_delete)
 
 
     def switch_elements(self):
@@ -296,14 +296,14 @@ class Optimizer:
             threshold *= 1.1
 
         # Also remove site if displacement is crazy high
-        to_delete = set()
-        ins_file = self.driver.get_res_file()
-        displacements = [x.displacement for x in ins_file.crystal_sites]
-        site_numbers = [x.site_number for x in ins_file.crystal_sites]
-        for i, d in enumerate(displacements):
-            if d > 0.6:
-                to_delete.add(site_numbers[i])
-        ins_file.remove_sites_by_number(to_delete)
+        # to_delete = set()
+        # ins_file = self.driver.get_res_file()
+        # displacements = [x.displacement for x in ins_file.crystal_sites]
+        # site_numbers = [x.site_number for x in ins_file.crystal_sites]
+        # for i, d in enumerate(displacements):
+        #     if d > 0.6:
+        #         to_delete.add(site_numbers[i])
+        # ins_file.remove_sites_by_number(to_delete)
 
 
     def get_shortest_bond(self, ins_file):
