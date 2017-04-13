@@ -12,10 +12,21 @@ class Optimizer:
     """
     Class for performing single crystal refinement
     """
-    def __init__(self):
-        self.r1_similarity_threshold = 0.002
-        self.r1_threshold = 0.1
-        self.use_ml_model = False
+    def __init__(self, r1_similarity_threshold=0.002, occupancy_threshold=0.02, r1_threshold=0.1,
+                 least_squares_iterations=10, use_ml_model=False):
+        """
+        :param r1_similarity_threshold: If r1 scores for multiple options are within this similarity threshold, the
+            optimizer will branch and explore all the options.
+        :param occupancy_threshold: Minimum deviation in occupancy or site mixing to apply those steps
+        :param r1_threshold: Threshold to denote a high r1 score, which triggers an alternate path in the optimizer
+            where bond lengths drive the optimization instead of r1
+        :param use_ml_model: Whether to use the bond length ml model to estimate bond lengths
+        """
+        self.r1_similarity_threshold = r1_similarity_threshold
+        self.r1_threshold = r1_threshold
+        self.occupancy_threshold = occupancy_threshold
+        self.least_squares_iterations = least_squares_iterations
+        self.use_ml_model = use_ml_model
 
     def run(self, path_to_xl, path_to_xs, ins_path, input_prefix, output_prefix, use_wine=False):
         """
@@ -46,7 +57,7 @@ class Optimizer:
         # Read in and run initial SHELXTL file
         ins_file = self.driver.get_ins_file()
         ins_file.remove_command('L.S.')
-        ins_file.add_command('L.S.', [str(10)])
+        ins_file.add_command('L.S.', [str(self.least_squares_iterations)])
         self.history = OptimizerHistory(self.driver, ins_file)
 
         # Optimization
@@ -134,7 +145,7 @@ class Optimizer:
                 for elem in range(1, num_elems+1):
                     ins_file.change_element(i, elem)
                     iteration = self.history.run_iter(ins_file, prev_iter)
-                    if iteration is not None:
+                    if iteration is not None and iteration.res_file.get_crystal_sites_by_number(i + 1)[0].displacement > 0.0:
                         iterations.append(iteration)
                 iterations.sort(key=lambda i: i.r1)
                 for iteration in iterations:
@@ -273,9 +284,11 @@ class Optimizer:
                 iteration = self.history.run_iter(ins_file, initial)
 
                 # If changing the occupancy decreased r1, decreased the displacement, and resulted in an occupancy
-                # of less than 95%, add it to the history
-                if iteration is not None and iteration.r1 < prev_iter.r1 and float(iteration.res_file.fvar_vals[-1]) < 0.98 and \
-                                iteration.res_file.crystal_sites[i].displacement < displacement:
+                # that satisfies the threshold, add it to the history
+                if iteration is not None \
+                        and iteration.r1 < prev_iter.r1 \
+                        and float(iteration.res_file.fvar_vals[-1]) < (1 - self.occupancy_threshold) \
+                        and iteration.res_file.crystal_sites[i].displacement < displacement:
                     self.history.save(iteration)
 
     def try_site_mixing(self, initial):
@@ -329,7 +342,7 @@ class Optimizer:
                     if iteration is not None:
                         occupancy_var = float(iteration.res_file.fvar_vals[-1])
                         # Only include occupancies that are actually split
-                        if occupancy_var > 0.02 and occupancy_var < 0.98:
+                        if occupancy_var > self.occupancy_threshold and occupancy_var < (1 - self.occupancy_threshold):
                             iterations.append(iteration)
                 if len(iterations) == 0:
                     continue
