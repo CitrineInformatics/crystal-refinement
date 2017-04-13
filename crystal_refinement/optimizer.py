@@ -136,7 +136,7 @@ class Optimizer:
         displacements = [x.displacement for x in ins_file.crystal_sites]
         site_numbers = [x.site_number for x in ins_file.crystal_sites]
         for i, d in enumerate(displacements):
-            if d > 0.6:
+            if d > 1.0:
                 to_delete.add(site_numbers[i])
         ins_file.remove_sites_by_number(to_delete)
 
@@ -195,12 +195,15 @@ class Optimizer:
 
         #  Try with extinguishing
         ins_file.add_exti()
+        print self.r1_history
+
         self.run_iter(ins_file)
 
 
         #  If exti did not help, revert the ins file
         if self.r1_history[-2] < self.r1_history[-1]:
             self.run_iter(prev_ins)
+        print self.r1_history
 
     def try_add_q(self):
         """
@@ -458,10 +461,10 @@ def main():
     # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
     # subdir = "Er4Ru2InGe4"
     path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
-    ins_folder = "/Users/julialing/Documents/DataScience/crystal_refinement/single_crystal_data/unseen"
+    ins_folder = "/Users/julialing/Documents/DataScience/crystal_refinement/single_crystal_data/"
 
-    # test_all(path_to_SXTL_dir, ins_folder)
-    run_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True)
+    test_all(path_to_SXTL_dir, ins_folder, use_wine=True)
+    # run_all(path_to_SXTL_dir, ins_folder, use_wine=True)
     # test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir + "/"), "absfac1", print_files=True)
     # run_single(path_to_SXTL_dir, os.path.join(ins_path, "work/"), "absfac1")
 
