@@ -43,8 +43,19 @@ class SHELXDriver:
         return SHELXFile(res_text)
 
     def check_res_file(self):
-        res_written = os.path.getsize(self.res_file) > 0.0
-        return res_written
+        """
+        Check to make sure that results file exists, has nonzero size, and has q peaks (so it ran properly)
+        :return:
+        """
+        if not os.path.isfile(self.res_file):
+            return False
+        if os.path.getsize(self.res_file) < 1.0:
+            return False
+        res_file = self.get_res_file()
+        if len(res_file.q_peaks) == 0:
+            return False
+
+        return True
 
     def run_SHELXTL(self, ins_file_obj, suppress_output=True, cmd="xl.exe"):
         """
@@ -57,6 +68,8 @@ class SHELXDriver:
         with open(self.ins_file, 'w') as f:
             f.write(ins_file_obj.get_ins_text())
         self.run_SHELXTL_command(suppress_output=suppress_output, cmd=cmd)
+        if not self.check_res_file():
+            return None
         return self.get_res_file()
 
 
