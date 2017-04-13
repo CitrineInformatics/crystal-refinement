@@ -60,7 +60,7 @@ class SHELXFile:
             line = lines[line_idx]
             self.extra_text[self.extra_text_section] += line + "\n"
             line_idx += 1
-            if "PLAN" in line:
+            if "SIZE" in line:
                 break
 
         line_idx += 1
@@ -121,6 +121,9 @@ class SHELXFile:
             line_idx += 1
 
 
+    def get_crystal_sites_text(self):
+        return "\n".join([" ".join(cs.write_line()) for cs in self.crystal_sites])
+
     def get_ins_text(self):
         """
         Given a SHELXFile object, it returns the string that can be used to write it out
@@ -136,18 +139,18 @@ class SHELXFile:
                 res += " ".join(values)
             res += "\n"
         res += "FVAR " + " ".join([str(x) for x in self.fvar_vals]) + "\n"
-        res += "\n".join([" ".join(cs.write_line()) for cs in self.crystal_sites]) + "\n"
+        res += self.get_crystal_sites_text() + "\n"
         res += self.extra_text[2]
         return res
 
     # various editing methods ...
-    def add_no_arg_command(self, cmd):
+    def add_command(self, cmd, values=None):
         """
         Add a command to the ins file
         :param cmd: command to add
         """
         if cmd not in map(lambda tup: tup[0], self.commands):
-            self.commands.append((cmd, None))
+            self.commands.append((cmd, values))
 
     def remove_command(self, cmd):
         """
@@ -162,13 +165,13 @@ class SHELXFile:
                 del self.commands[i]
 
     def add_anisotropy(self):
-        self.add_no_arg_command("ANIS")
+        self.add_command("ANIS")
 
     def remove_anisotropy(self):
         self.remove_command("ANIS")
 
     def add_exti(self):
-        self.add_no_arg_command("EXTI")
+        self.add_command("EXTI")
 
     def remove_exti(self):
         self.remove_command("EXTI")
@@ -179,9 +182,9 @@ class SHELXFile:
         :param site_index: Index (starting at 0) of site
         :param element_index: Index (starting at 1) of element
         """
-        site_index = self.get_crystal_sites_by_number(site_index + 1)[0]
-        self.crystal_sites[site_index].element = element_index
-        self.crystal_sites[site_index].name = self.elements[element_index-1] + str(site_index+1)
+        site = self.get_crystal_sites_by_number(site_index + 1)[0]
+        self.crystal_sites[site].element = element_index
+        self.crystal_sites[site].name = self.elements[element_index-1] + str(site_index+1)
 
     def move_q_to_crystal(self):
         """

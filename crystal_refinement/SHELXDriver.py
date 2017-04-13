@@ -53,8 +53,9 @@ class SHELXDriver:
         with open(self.ins_file, 'w') as f:
             f.write(ins_file_obj.get_ins_text())
         self.run_SHELXTL_command(suppress_output=suppress_output, cmd=cmd)
+        if not self.has_valid_res_file():
+            return None
         return self.get_res_file()
-
 
     def run_SHELXTL_command(self, cmd="xl", suppress_output=True):
         """
@@ -72,6 +73,20 @@ class SHELXDriver:
             subprocess.call(command_args, stdout=open(os.devnull, "w"))
         else:
             subprocess.call(command_args)
+
+    def has_valid_res_file(self):
+        """
+        Check to make sure that results file exists, has nonzero size, and has q peaks (so it ran properly)
+        :return:
+        """
+        if not os.path.isfile(self.res_file):
+            return False
+        if os.path.getsize(self.res_file) < 1.0:
+            return False
+        res_file = self.get_res_file()
+        if len(res_file.q_peaks) == 0:
+            return False
+        return True
 
 
 def main():
