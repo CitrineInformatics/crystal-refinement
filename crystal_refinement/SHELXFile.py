@@ -176,6 +176,19 @@ class SHELXFile:
     def remove_exti(self):
         self.remove_command("EXTI")
 
+    def get_analytic_formula(self):
+        formula = ""
+        for site in self.crystal_sites:
+            el = site.name.replace(str(site.site_number), "")
+            prefix = 1
+            if site.occupancy_prefix < 0:
+                prefix = 1.0 - float(self.fvar_vals[-1 * site.occupancy_prefix - 1])
+            if site.occupancy_prefix > 1:
+                prefix = float(self.fvar_vals[site.occupancy_prefix - 1])
+            stoich = site.occupancy * prefix
+            formula += el + stoich
+        return formula
+
     def change_element(self, site_index, element_index):
         """
         Changes the element at a given site
