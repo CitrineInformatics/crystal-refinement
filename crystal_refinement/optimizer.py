@@ -43,6 +43,10 @@ class Optimizer:
 
         # Read in and run initial SHELXTL file
         ins_file = self.driver.get_ins_file()
+        for cmd in ins_file.commands:
+            if cmd[0] == "L.S.":
+                ins_file.commands.remove(cmd)
+                ins_file.commands.insert(0, ('L.S.', [str(10)]))
         self.run_iter(ins_file)
 
         # Optimization
@@ -52,7 +56,9 @@ class Optimizer:
             self.try_add_q()
             self.try_remove_site()
 
+        ins_file = self.driver.get_res_file()
         self.run_iter(ins_file)
+
         self.switch_elements()
         # There is currently an inherent assumption that switch elements will never be called after site mixing, since
         # after site mixing, the indices don't line up anymore
@@ -82,7 +88,10 @@ class Optimizer:
             r1_history = self.r1_history
         ins_history.append(copy.deepcopy(ins_file))
         res = self.driver.run_SHELXTL(ins_file)
-        r1_history.append(res.r1)
+        if res is not None:
+            r1_history.append(res.r1)
+        else:
+            r1_history.append(np.infty)
         return res
 
     def get_bonds(self, ins_file):
@@ -123,6 +132,14 @@ class Optimizer:
             self.run_iter(ins_file)
             ins_file = self.driver.get_res_file()
 
+        # Also remove site if displacement is crazy high
+        displacements = [x.displacement for x in ins_file.crystal_sites]
+        site_numbers = [x.site_number for x in ins_file.crystal_sites]
+        for i, d in enumerate(displacements):
+            if d > 0.6:
+                to_delete.add(site_numbers[i])
+        ins_file.remove_sites_by_number(to_delete)
+
 
     def switch_elements(self):
         ins_file = self.driver.get_res_file()
@@ -130,22 +147,21 @@ class Optimizer:
         # Want to make changes from largest displacement to smallest
         displacements = zip(map((lambda x: x.displacement), ins_file.crystal_sites), map((lambda x: x.site_number), ins_file.crystal_sites))
         displacements.sort(key=lambda x: x[0], reverse=True)
-        print "displacements", displacements
         order = [x[1] - 1 for x in displacements]
+
         num_elems = len(ins_file.elements)
         for i in order:
             for elem in range(1, num_elems+1):
+
                 ins_file.change_element(i, elem)
                 self.run_iter(ins_file)
 
                 # Check to make sure no negative displacements caused
-                if self.driver.check_res_file():
-                    res_file = self.driver.get_res_file()
-                    cs = res_file.crystal_sites[res_file.get_crystal_sites_by_number(i+1)[0]]
-                    if cs.displacement < 0.0:
-                        self.r1_history[-1] = np.infty
-                else:
+                res_file = self.driver.get_res_file()
+                cs = res_file.crystal_sites[res_file.get_crystal_sites_by_number(i+1)[0]]
+                if cs.displacement < 0.0:
                     self.r1_history[-1] = np.infty
+
 
             best_elem = np.argmin(self.r1_history[-num_elems:]) + 1
             ins_file.change_element(i, best_elem)
@@ -181,6 +197,7 @@ class Optimizer:
         ins_file.add_exti()
         self.run_iter(ins_file)
 
+
         #  If exti did not help, revert the ins file
         if self.r1_history[-2] < self.r1_history[-1]:
             self.run_iter(prev_ins)
@@ -208,7 +225,17 @@ class Optimizer:
             self.run_iter(ins_file)
 
             #   If adding one peak helped, recursively try adding another peak until it stops helping
-            if self.r1_history[-1] < r_before:
+            try_another = True
+            if not self.driver.check_res_file():
+                try_another = False
+            else:
+                res_file = self.driver.get_res_file()
+                displacements = [x.displacement for x in res_file.crystal_sites]
+                if displacements[-1] > np.mean(displacements[:-1]) + 2.0*np.std(displacements[:-1]):
+                    try_another = False
+            if self.r1_history[-1] > r_before:
+                try_another = False
+            if try_another:
                 self.try_add_q()
 
             #  If adding peak didn't help, take it back off
@@ -240,6 +267,9 @@ class Optimizer:
         r_penalty = 1.1
         bonds = self.get_bonds(ins_file)
         threshold = 0.1
+
+        displacements = [x.displacement for x in ins_file.crystal_sites]
+
         while True:
             ins_file = copy.deepcopy(prev_ins)
             to_delete = set()
@@ -252,9 +282,22 @@ class Optimizer:
                     to_delete.add(max(a1_num, a2_num))
             ins_file.remove_sites_by_number(to_delete)
             self.run_iter(ins_file)
+
+
             if self.r1_history[-1] < r_before * r_penalty or len(to_delete) == 0:
                 break
             threshold *= 1.1
+
+        # Also remove site if displacement is crazy high
+        to_delete = set()
+        ins_file = self.driver.get_res_file()
+        displacements = [x.displacement for x in ins_file.crystal_sites]
+        site_numbers = [x.site_number for x in ins_file.crystal_sites]
+        for i, d in enumerate(displacements):
+            if d > 0.6:
+                to_delete.add(site_numbers[i])
+        ins_file.remove_sites_by_number(to_delete)
+
 
     def get_shortest_bond(self, ins_file):
         return sorted([utils.get_ideal_bond_length(el.capitalize(), el.capitalize()) for el in ins_file.elements])[0]
