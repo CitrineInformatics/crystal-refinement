@@ -64,7 +64,12 @@ class Optimizer:
         # after site mixing, the indices don't line up anymore
 
         self.try_site_mixing()
+
+
         self.change_occupancy()
+        ins_file = self.driver.get_res_file()
+        self.run_iter(ins_file)
+        print self.r1_history
         self.try_exti()
         self.try_anisotropy()
         self.use_suggested_weights()
@@ -195,7 +200,7 @@ class Optimizer:
 
         #  Try with extinguishing
         ins_file.add_exti()
-        print self.r1_history
+        # print self.r1_history
 
         self.run_iter(ins_file)
 
@@ -203,7 +208,7 @@ class Optimizer:
         #  If exti did not help, revert the ins file
         if self.r1_history[-2] < self.r1_history[-1]:
             self.run_iter(prev_ins)
-        print self.r1_history
+        # print self.r1_history
 
     def try_add_q(self):
         """
@@ -328,8 +333,10 @@ class Optimizer:
             ins_file.add_variable_occupancy(i)
             res = self.run_iter(ins_file)
             # if r1 or displacement go up, undo
-            if self.r1_history[-1] > r_before or res.crystal_sites[i].displacement > displacement:
+            print "FVAR", res.fvar_vals
+            if self.r1_history[-1] > r_before or res.crystal_sites[i].displacement > displacement or float(res.fvar_vals[-1]) < 0.0:
                 self.run_iter(prev_ins)
+            print "end of change occupancy", self.r1_history
 
     def try_site_mixing(self):
         """
