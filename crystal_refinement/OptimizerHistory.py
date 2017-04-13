@@ -45,16 +45,28 @@ class OptimizerIteration:
     def generate_graph(self, output_file):
         dot = Digraph()
         node_label = str(random.getrandbits(16))
-        dot.node(node_label, str(self.r1))
+        dot.node(node_label, str(self.r1), color="green")
+        best = min([x.r1 for x in self.get_leaves()])
         for i, child in enumerate(self.children):
-            child._generate_graph(str(random.getrandbits(16)), node_label, dot)
+            child._generate_graph(str(random.getrandbits(16)), node_label, dot, best)
         dot.render(output_file, view=True)
 
-    def _generate_graph(self, node_label, parent_label, dot):
-        dot.node(node_label, str(self.r1))
-        dot.edge(parent_label, node_label)
+    def _generate_graph(self, node_label, parent_label, dot, best):
+        highlight = False
         for i, child in enumerate(self.children):
-            child._generate_graph(str(random.getrandbits(16)), node_label, dot)
+            if child._generate_graph(str(random.getrandbits(16)), node_label, dot, best):
+                highlight = True
+        if len(self.children) == 0:
+            if self.r1 == best:
+                highlight = True
+        if highlight:
+            dot.node(node_label, str(self.r1), color="green")
+            dot.edge(parent_label, node_label, color="green")
+        else:
+            dot.node(node_label, str(self.r1))
+            dot.edge(parent_label, node_label)
+        return highlight
+
 
     # Copy this iteration into the next generation
     def propagate(self):
