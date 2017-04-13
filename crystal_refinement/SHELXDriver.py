@@ -48,14 +48,11 @@ class SHELXDriver:
         :return:
         """
         if not os.path.isfile(self.res_file):
-            print "got here1"
             return False
         if os.path.getsize(self.res_file) < 1.0:
-            print "got here2", os.path.getsize(self.res_file)
             return False
         res_file = self.get_res_file()
         if len(res_file.q_peaks) == 0:
-            print "got here4"
             return False
 
         return True
