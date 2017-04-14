@@ -176,16 +176,19 @@ class SHELXFile:
     def remove_exti(self):
         self.remove_command("EXTI")
 
+    def get_site_stoichiometry(self, crystal_site):
+        prefix = 1
+        if crystal_site.occupancy_prefix < 0:
+            prefix = 1.0 - float(self.fvar_vals[-1 * crystal_site.occupancy_prefix - 1])
+        if crystal_site.occupancy_prefix > 1:
+            prefix = float(self.fvar_vals[crystal_site.occupancy_prefix - 1])
+        return crystal_site.occupancy * prefix
+
     def get_analytic_formula(self):
         formula = ""
         for site in self.crystal_sites:
             el = site.name.replace(str(site.site_number), "")
-            prefix = 1
-            if site.occupancy_prefix < 0:
-                prefix = 1.0 - float(self.fvar_vals[-1 * site.occupancy_prefix - 1])
-            if site.occupancy_prefix > 1:
-                prefix = float(self.fvar_vals[site.occupancy_prefix - 1])
-            stoich = site.occupancy * prefix
+            stoich = self.get_site_stoichiometry(site)
             formula += el + stoich
         return formula
 
