@@ -1,7 +1,9 @@
 from pymatgen.structure_prediction.substitution_probability import SubstitutionProbability
 from pymatgen.core.composition import Element
-import re
+import re, copy
 from collections import defaultdict
+from pymatgen.io.cif import CifParser
+from SHELXDriver import SHELXDriver
 
 
 def get_specie(el, ox):
@@ -32,6 +34,15 @@ def get_substitution_probability(el1, el2):
     return total
 
 
+def score_compound_bonds(bonds, use_ml_model=False):
+    """
+    The smaller the better
+    :param bonds:
+    :param use_ml_model:
+    :return:
+    """
+    return -sum([x[1] for x in site_mixing_priority(bonds, 2, use_ml_model)])
+
 def get_bond_score(bond, use_ml_model=False):
     """
     Scores the likelihood of a bond based on its deviation from an ideal bond length.
@@ -48,7 +59,7 @@ def get_bond_score(bond, use_ml_model=False):
     return -abs(bond[2] - ideal_bond_length)
 
 
-def site_mixing_priority(bonds, use_ml_model=False):
+def site_mixing_priority(bonds, n_bonds=4, use_ml_model=False):
     """
     Determines priority for adding in site mixing.  Finds most problematic sites based on whether bonds
     are shorter than expected.
@@ -62,7 +73,7 @@ def site_mixing_priority(bonds, use_ml_model=False):
         bond_by_atom[bond[0]].append(bond_score)
         bond_by_atom[bond[1]].append(bond_score)
     # Average over scores from 4 shortest bonds
-    res = map(lambda tup: (tup[0], sum(sorted(tup[1])[:4])), bond_by_atom.items())
+    res = map(lambda tup: (tup[0], sum(sorted(tup[1])[:n_bonds])), bond_by_atom.items())
     # Sort by which bonds are the shortest compared to what we'd expect
     res = sorted(res, key=lambda tup: tup[1])
     # Get associated site index
@@ -82,8 +93,27 @@ def get_ideal_bond_length(specie_name1, specie_name2, use_ml_model=False):
     """
     if use_ml_model:
         pass
-    else:
-        # Use pymatgen to get approximate bond length = sum of atomic radii
-        el1 = Element(re.sub('\d', "", specie_name1))
-        el2 = Element(re.sub('\d', "", specie_name2))
-        return el1.atomic_radius + el2.atomic_radius
+    # Use pymatgen to get approximate bond length = sum of atomic radii
+    el1 = Element(re.sub('\d', "", specie_name1))
+    el2 = Element(re.sub('\d', "", specie_name2))
+    return el1.atomic_radius + el2.atomic_radius
+
+
+def get_bonds(driver, ins_file):
+    """
+    Get the bonds defined in the given ins_file
+
+    :param ins_file: SHELXFile object
+    :return res: List of bond tuples (element 1, element 2, bond length)
+    """
+    ins_file = copy.deepcopy(ins_file)
+    ins_file.add_command("ACTA")
+    ins_file.add_command("L.S.", ["0"])
+    driver.run_SHELXTL(ins_file)
+
+    with open(driver.cif_file) as f:
+        cif_file = CifParser.from_string(f.read())
+
+    cif_dict = cif_file.as_dict().values()[0]
+    return zip(cif_dict["_geom_bond_atom_site_label_1"], cif_dict["_geom_bond_atom_site_label_2"],
+               [float(x.replace("(", "").replace(")", "")) for x in cif_dict["_geom_bond_distance"]])

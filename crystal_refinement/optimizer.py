@@ -2,7 +2,6 @@ from SHELXDriver import SHELXDriver
 import os, re, copy, math, itertools, random
 import numpy as np
 import shutil
-from pymatgen.io.cif import CifParser
 from pymatgen.core.composition import Element
 import utils
 from OptimizerHistory import OptimizerHistory
@@ -22,6 +21,7 @@ class Optimizer:
             where bond lengths drive the optimization instead of r1
         :param use_ml_model: Whether to use the bond length ml model to estimate bond lengths
         """
+        self.overall_score_similarity_threshold = 0.05
         self.r1_similarity_threshold = r1_similarity_threshold
         self.r1_threshold = r1_threshold
         self.occupancy_threshold = occupancy_threshold
@@ -63,7 +63,7 @@ class Optimizer:
         # Optimization
         self.run_step(self.identify_sites)
         self.run_step(self.switch_elements)
-
+        # quit()
         # There is currently an inherent assumption that switch elements will never be called after site mixing, since
         # after site mixing, the indices don't line up anymore
         self.run_step(self.try_site_mixing)
@@ -79,24 +79,6 @@ class Optimizer:
     def run_step(self, step):
         for leaf in self.history.leaves:
             step(leaf)
-
-    def get_bonds(self, ins_file):
-        """
-        Get the bonds defined in the given ins_file
-
-        :param ins_file: SHELXFile object
-        :return res: List of bond tuples (element 1, element 2, bond length)
-        """
-        ins_file.add_command("ACTA")
-        self.driver.run_SHELXTL(ins_file)
-        ins_file.remove_command("ACTA")
-
-        with open(self.driver.cif_file) as f:
-            cif_file = CifParser.from_string(f.read())
-
-        cif_dict = cif_file.as_dict().values()[0]
-        return zip(cif_dict["_geom_bond_atom_site_label_1"], cif_dict["_geom_bond_atom_site_label_2"],
-                   [float(x.replace("(", "").replace(")", "")) for x in cif_dict["_geom_bond_distance"]])
 
     def get_shortest_bond(self, ins_file):
         return sorted([utils.get_ideal_bond_length(el.capitalize(), el.capitalize()) for el in ins_file.elements])[0]
@@ -120,7 +102,7 @@ class Optimizer:
         for i in range(5):
             ins_file = prev_iteration.get_res()
             to_delete = set()
-            for bond in sorted(self.get_bonds(ins_file), key=lambda tup: tup[2]):
+            for bond in sorted(utils.get_bonds(self.driver, ins_file), key=lambda tup: tup[2]):
                 # Threshold on how short the bonds are
                 if bond[2] / shortest_possible_bond < 0.5:
                     a1_num = int(re.search('\d+', bond[0]).group(0))
@@ -170,7 +152,7 @@ class Optimizer:
 
         ins_file = initial.get_res()
         r_penalty = 1.1
-        bonds = self.get_bonds(ins_file)
+        bonds = utils.get_bonds(self.driver, ins_file)
         threshold = 0.1
         while True:
             ins_file = initial.get_res()
@@ -218,9 +200,13 @@ class Optimizer:
                     if iteration is not None:
                         iterations.append(iteration)
                 iterations.sort(key=lambda i: i.r1)
+                print prev_iter.res_file.crystal_sites[i].name
                 for iteration in iterations:
+                    print iteration.ins_file.crystal_sites[i].name, iteration.r1, iteration.bond_score, iteration.overall_score
                     if iteration.r1 - iterations[0].r1 < self.r1_similarity_threshold:
                         self.history.save(iteration)
+                print "#"*50
+        quit()
 
     def change_occupancy(self, initial):
         ins_file = initial.get_res()
@@ -285,7 +271,7 @@ class Optimizer:
 
     def do_site_mixing(self, initial, tried, pairs):
         ins_file = initial.get_res()
-        bonds = self.get_bonds(ins_file)
+        bonds = utils.get_bonds(self.driver, ins_file)
         mixing_priority = utils.site_mixing_priority(bonds)
         # In case of ties, find all top tied priorities
         top_priority_score = mixing_priority[0][1]
@@ -384,20 +370,20 @@ class Optimizer:
 ########################################################################################################################
 
 
-def test_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp", use_wine=False,
+def test_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp", use_wine=False, print_files=False,
              generate_graph=False, annotate_graph=False, graph_path=""):
     subdirs = os.listdir(ins_folder)
     for dirname in subdirs:
         if dirname[0] != ".":
             print dirname
             test_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix, use_wine,
-                        generate_graph, annotate_graph, graph_path)
+                        print_files, generate_graph, annotate_graph, graph_path)
 
 
-def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix="temp", print_files=False, use_wine=False,
+def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix="temp", use_wine=False, print_files=False,
                 generate_graph=False, annotate_graph=False, graph_path=""):
     try:
-        ins_path = os.path.join(dirname, "work") + "/"
+        ins_path = os.path.join(dirname, "work")
         for filename in os.listdir(os.path.join(dirname, "Anton")):
             if ".hkl" in filename:
                 shutil.copy(os.path.join(dirname, "Anton", filename),
@@ -406,7 +392,7 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
                 final_res = os.path.join(dirname, "Anton", filename)
     except Exception:
         try:
-            ins_path = dirname + "/"
+            ins_path = dirname
             open(os.path.join(dirname, "1.hkl"))
             open(os.path.join(dirname, "1.ins"))
             final_res = os.path.join(dirname, "result.res")
@@ -444,7 +430,6 @@ def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix
     opt.run(os.path.join(path_to_SXTL_dir, "xl.exe"), os.path.join(path_to_SXTL_dir, "xs.exe"), ins_path, input_prefix, output_prefix, use_wine=use_wine,
             annotate_graph=annotate_graph)
     if generate_graph:
-        print os.path.join(graph_path, os.path.basename(ins_path))
         opt.history.head.generate_graph(os.path.join(graph_path, os.path.basename(ins_path)))
     return opt
 
@@ -455,7 +440,6 @@ def run_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix=
     print subdirs
     for dirname in subdirs:
         if dirname[0] != ".":
-            print dirname
             opt = run_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix, use_wine,
                              generate_graph, annotate_graph, graph_path)
             best_history = opt.history.get_best_history()
@@ -467,18 +451,18 @@ def main():
     path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
     # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/4-2-1-4 INS and HKL files"
     ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
-    subdir = "!solid_solution-Nd4Mn2CdSi2.5Ge1.5"
+    subdir = "Nd4Mn2AgGe4crystal"
     graph_output_path = "/Users/eantono/Documents/src/xtal_refinement/output"
     # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
     # ins_folder = "/Users/julialing/Documents/DataScience/crystal_refinement/single_crystal_data/"
 
-    # test_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True,
+    # test_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True, print_files=False,
     #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
-    # test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", print_files=True, use_wine=True,
-    #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
-    run_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True,
+    test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True, print_files=True,
       generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
-    # run_single(path_to_SXTL_dir, os.path.join(ins_path, "work/"), "absfac1",
+    # run_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True,
+    #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
+    # run_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True,
     #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
 
 if __name__ == "__main__":

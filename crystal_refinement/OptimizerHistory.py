@@ -1,15 +1,18 @@
-import copy, random
+import copy, random, utils
 from graphviz import Digraph
 import numpy as np
+
 
 class OptimizerIteration:
     """
     Define class to hold information on one optimizer iteration
     """
-    def __init__(self, parent, ins_file, res_file, annotation=None):
+    def __init__(self, parent, ins_file, res_file, bond_score, annotation=None):
         self.ins_file = copy.deepcopy(ins_file)
         self.res_file = copy.deepcopy(res_file)
         self.r1 = res_file.r1
+        self.bond_score = bond_score
+        self.overall_score = self.r1 * self.bond_score
         self.parent = parent
         self.dead_branch = False
         self.children = []
@@ -50,7 +53,7 @@ class OptimizerIteration:
         best = self.get_best()
         for i, child in enumerate(self.children):
             child._generate_graph(str(random.getrandbits(16)), node_label, dot, best)
-        dot.render(output_file, view=True)
+        dot.render(output_file, view=False)
 
     def _generate_graph(self, node_label, parent_label, dot, best):
         highlight = False
@@ -88,7 +91,8 @@ class OptimizerHistory:
     def __init__(self, driver, ins_file):
         self.driver = driver
         res = self.driver.run_SHELXTL(ins_file)
-        self.head = OptimizerIteration(None, ins_file, res)
+        bonds = utils.get_bonds(self.driver, res)
+        self.head = OptimizerIteration(None, ins_file, res, utils.score_compound_bonds(bonds))
         self.leaves = [self.head]
 
     def run_iter(self, ins_file, parent_iteration, annotation=None):
@@ -101,8 +105,8 @@ class OptimizerHistory:
         res = self.driver.run_SHELXTL(ins_file)
         if res is None:
             return None
-
-        new_iter = OptimizerIteration(parent_iteration, ins_file, res, annotation)
+        bonds = utils.get_bonds(self.driver, res)
+        new_iter = OptimizerIteration(parent_iteration, ins_file, res, utils.score_compound_bonds(bonds), annotation)
         return new_iter
 
     def save(self, iterations):
