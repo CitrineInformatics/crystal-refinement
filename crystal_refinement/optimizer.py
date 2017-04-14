@@ -448,17 +448,17 @@ def run_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix=
 
 def main():
     path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
-    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/4-2-1-4 INS and HKL files"
-    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
-    subdir = "Nd4Mn2AgGe4crystal"
+    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/4-2-1-4 INS and HKL files"
+    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
+    subdir = "Nd4Mn2CdGe4crystal"
     graph_output_path = "/Users/eantono/Documents/src/xtal_refinement/output"
     # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
     # ins_folder = "/Users/julialing/Documents/DataScience/crystal_refinement/single_crystal_data/"
 
-    test_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True, print_files=False,
-      generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
-    # test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True, print_files=True,
+    # test_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True, print_files=False,
     #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
+    test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True, print_files=True,
+      generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
     # run_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True,
     #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
     # run_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True,

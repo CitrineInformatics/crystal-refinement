@@ -34,15 +34,25 @@ def get_substitution_probability(el1, el2):
     return total
 
 
-def score_compound_bonds(bonds, use_ml_model=False):
+def score_compound_bonds(bonds, shelx_file, use_ml_model=False):
     """
     The smaller the better
     :param bonds:
     :param use_ml_model:
     :return:
     """
-    bond_scores = [x[1] for x in site_mixing_priority(bonds, 2, use_ml_model)]
-    return -sum(bond_scores)/len(bond_scores)
+    site_bond_scores = get_site_bond_scores(bonds, 1, use_ml_model)
+    total_stoich = 0
+    stoich_weighted_score = 0
+    for site_name, score in site_bond_scores:
+        stoich = 0
+        for site in shelx_file.crystal_sites:
+            if site.name.capitalize() == site_name:
+                stoich = shelx_file.get_site_stoichiometry(site)
+        total_stoich += stoich
+        stoich_weighted_score += stoich * score
+
+    return -stoich_weighted_score / total_stoich
 
 def get_bond_score(bond, use_ml_model=False):
     """
@@ -57,17 +67,19 @@ def get_bond_score(bond, use_ml_model=False):
     """
     ideal_bond_length = get_ideal_bond_length(bond[0], bond[1], use_ml_model)
     # Calculate amount which bonds deviate from the expected bond length
-    return -abs(bond[2] - ideal_bond_length)
+    deviation = bond[2] - ideal_bond_length
+    if deviation > 0:
+        deviation *= 0.5
+    return -abs(deviation)
 
-
-def site_mixing_priority(bonds, n_bonds=4, use_ml_model=False):
+def get_site_bond_scores(bonds, n_bonds=4, use_ml_model=False):
     """
-    Determines priority for adding in site mixing.  Finds most problematic sites based on whether bonds
-    are shorter than expected.
-    TODO: What if bonds are longer than expected?
-    :param bonds: List of bond tuples (atom1, atom2, distance) for which to calculate priority
-    :return: List of (site number, site score) tuples sorted with decreasing priority.
-    """
+        Determines priority for adding in site mixing.  Finds most problematic sites based on whether bonds
+        are shorter than expected.
+        TODO: What if bonds are longer than expected?
+        :param bonds: List of bond tuples (atom1, atom2, distance) for which to calculate priority
+        :return: List of (site number, site score) tuples sorted with decreasing priority.
+        """
     bond_by_atom = defaultdict(lambda: [])
     for bond in bonds:
         bond_score = get_bond_score(bond, use_ml_model)
@@ -76,9 +88,12 @@ def site_mixing_priority(bonds, n_bonds=4, use_ml_model=False):
     # Average over scores from 4 shortest bonds
     res = map(lambda tup: (tup[0], sum(sorted(tup[1])[:n_bonds])), bond_by_atom.items())
     # Sort by which bonds are the shortest compared to what we'd expect
-    res = sorted(res, key=lambda tup: tup[1])
+    return sorted(res, key=lambda tup: tup[1])
+
+def site_mixing_priority(bonds, n_bonds=4, use_ml_model=False):
+
     # Get associated site index
-    return map(lambda tup: (int(re.search("\d+", tup[0]).group(0)), tup[1]), res)
+    return map(lambda tup: (int(re.search("\d+", tup[0]).group(0)), tup[1]), get_site_bond_scores(bonds, n_bonds, use_ml_model))
 
 
 def get_ideal_bond_length(specie_name1, specie_name2, use_ml_model=False):

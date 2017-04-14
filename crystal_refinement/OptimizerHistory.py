@@ -48,7 +48,7 @@ class OptimizerIteration:
 
     def generate_graph(self, output_file):
         dot = Digraph()
-        node_label = str(random.getrandbits(16))
+        node_label = str(random.getrandbits(32))
         dot.node(node_label, "r1={}, bonds={:.4}\noverall={:.5}".format(self.r1, self.bond_score, self.overall_score), color="green")
         best = self.get_best()
         for i, child in enumerate(self.children):
@@ -92,7 +92,7 @@ class OptimizerHistory:
         self.driver = driver
         res = self.driver.run_SHELXTL(ins_file)
         bonds = utils.get_bonds(self.driver, res)
-        self.head = OptimizerIteration(None, ins_file, res, utils.score_compound_bonds(bonds))
+        self.head = OptimizerIteration(None, ins_file, res, utils.score_compound_bonds(bonds, ins_file))
         self.leaves = [self.head]
 
     def run_iter(self, ins_file, parent_iteration, annotation=None):
@@ -106,7 +106,7 @@ class OptimizerHistory:
         if res is None:
             return None
         bonds = utils.get_bonds(self.driver, res)
-        new_iter = OptimizerIteration(parent_iteration, ins_file, res, utils.score_compound_bonds(bonds), annotation)
+        new_iter = OptimizerIteration(parent_iteration, ins_file, res, utils.score_compound_bonds(bonds, ins_file), annotation)
         return new_iter
 
     def save(self, iterations):
