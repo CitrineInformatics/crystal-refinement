@@ -21,7 +21,7 @@ class Optimizer:
             where bond lengths drive the optimization instead of r1
         :param use_ml_model: Whether to use the bond length ml model to estimate bond lengths
         """
-        self.overall_score_similarity_threshold = 0.05
+        self.overall_score_similarity_threshold = 0.5
         self.r1_similarity_threshold = r1_similarity_threshold
         self.r1_threshold = r1_threshold
         self.occupancy_threshold = occupancy_threshold
@@ -199,14 +199,13 @@ class Optimizer:
                         iteration = self.history.run_iter(ins_file, prev_iter)
                     if iteration is not None:
                         iterations.append(iteration)
-                iterations.sort(key=lambda i: i.r1)
-                print prev_iter.res_file.crystal_sites[i].name
+                iterations.sort(key=lambda i: i.overall_score)
+                # print prev_iter.res_file.crystal_sites[i].name
                 for iteration in iterations:
-                    print iteration.ins_file.crystal_sites[i].name, iteration.r1, iteration.bond_score, iteration.overall_score
-                    if iteration.r1 - iterations[0].r1 < self.r1_similarity_threshold:
+                    # print iteration.ins_file.crystal_sites[i].name, iteration.r1, iteration.bond_score, iteration.overall_score
+                    if iteration.overall_score - iterations[0].overall_score < self.overall_score_similarity_threshold:
                         self.history.save(iteration)
-                print "#"*50
-        quit()
+                # print "#"*50
 
     def change_occupancy(self, initial):
         ins_file = initial.get_res()
@@ -237,7 +236,7 @@ class Optimizer:
                 # If changing the occupancy decreased r1, decreased the displacement, and resulted in an occupancy
                 # that satisfies the threshold, add it to the history
                 if iteration is not None \
-                        and iteration.r1 < prev_iter.r1 \
+                        and iteration.overall_score < prev_iter.overall_score \
                         and float(iteration.res_file.fvar_vals[-1]) < (1 - self.occupancy_threshold) \
                         and iteration.res_file.crystal_sites[i].displacement < displacement:
                     self.history.save(iteration)
@@ -301,11 +300,11 @@ class Optimizer:
                             iterations.append(iteration)
                 if len(iterations) == 0:
                     continue
-                iterations.sort(key=lambda i: i.r1)
-                best_r1 = min([prev_iter.r1, iterations[0].r1])
-                if prev_iter.r1 - best_r1 < self.r1_similarity_threshold:
+                iterations.sort(key=lambda i: i.overall_score)
+                best_r1 = min([prev_iter.overall_score, iterations[0].overall_score])
+                if prev_iter.overall_score - best_r1 < self.overall_score_similarity_threshold:
                     prev_iter.propagate()
-                if iterations[0].r1 - best_r1 < self.r1_similarity_threshold:
+                if iterations[0].overall_score - best_r1 < self.overall_score_similarity_threshold:
                     self.history.save(iterations[0])
                 for leaf in prev_iter.get_leaves():
                     self.do_site_mixing(leaf, tried.union(set(top_priority)), pairs)
@@ -326,7 +325,7 @@ class Optimizer:
         else:
             iteration = self.history.run_iter(ins_file, initial)
         #  If anisotropy helped, add it to the history
-        if iteration is not None and iteration.r1 < initial.r1:
+        if iteration is not None and iteration.overall_score < initial.overall_score:
             self.history.save(iteration)
 
     def try_exti(self, initial):
@@ -344,7 +343,7 @@ class Optimizer:
             iteration = self.history.run_iter(ins_file, initial)
 
         #  If exti helped, add it to the history
-        if iteration is not None and iteration.r1 < initial.r1:
+        if iteration is not None and iteration.overall_score < initial.overall_score:
             self.history.save(iteration)
 
     def use_suggested_weights(self, initial):
@@ -363,7 +362,7 @@ class Optimizer:
             iteration = self.history.run_iter(ins_file, initial)
 
         #  If exti helped, add it to the history
-        if iteration is not None and iteration.r1 < initial.r1:
+        if iteration is not None and iteration.overall_score < initial.overall_score:
             self.history.save(iteration)
 
 
@@ -449,17 +448,17 @@ def run_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix=
 
 def main():
     path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
-    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/4-2-1-4 INS and HKL files"
-    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
+    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/4-2-1-4 INS and HKL files"
+    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
     subdir = "Nd4Mn2AgGe4crystal"
     graph_output_path = "/Users/eantono/Documents/src/xtal_refinement/output"
     # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
     # ins_folder = "/Users/julialing/Documents/DataScience/crystal_refinement/single_crystal_data/"
 
-    # test_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True, print_files=False,
-    #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
-    test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True, print_files=True,
+    test_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True, print_files=False,
       generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
+    # test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True, print_files=True,
+    #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
     # run_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True,
     #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
     # run_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True,

@@ -12,7 +12,7 @@ class OptimizerIteration:
         self.res_file = copy.deepcopy(res_file)
         self.r1 = res_file.r1
         self.bond_score = bond_score
-        self.overall_score = self.r1 * self.bond_score
+        self.overall_score = self.r1 ** 3 * self.bond_score * 1e4
         self.parent = parent
         self.dead_branch = False
         self.children = []
@@ -49,7 +49,7 @@ class OptimizerIteration:
     def generate_graph(self, output_file):
         dot = Digraph()
         node_label = str(random.getrandbits(16))
-        dot.node(node_label, str(self.r1), color="green")
+        dot.node(node_label, "r1={}, bonds={:.4}\noverall={:.5}".format(self.r1, self.bond_score, self.overall_score), color="green")
         best = self.get_best()
         for i, child in enumerate(self.children):
             child._generate_graph(str(random.getrandbits(16)), node_label, dot, best)
@@ -64,10 +64,10 @@ class OptimizerIteration:
             if self == best:
                 highlight = True
         if highlight:
-            dot.node(node_label, str(self.r1), color="green")
+            dot.node(node_label, "r1={}, bonds={:.4}\noverall={:.5}".format(self.r1, self.bond_score, self.overall_score), color="green")
             dot.edge(parent_label, node_label, color="green", label=self.annotation)
         else:
-            dot.node(node_label, str(self.r1))
+            dot.node(node_label, "r1={} bonds={:.4}\noverall={:.5}".format(self.r1, self.bond_score, self.overall_score))
             dot.edge(parent_label, node_label, label=self.annotation)
         return highlight
 
@@ -77,11 +77,11 @@ class OptimizerIteration:
         new_annotation = None
         if self.annotation is not None:
             new_annotation = "Propagated from previous generation"
-        new_child = OptimizerIteration(self, self.get_ins(), self.get_res(), new_annotation)
+        new_child = OptimizerIteration(self, self.get_ins(), self.get_res(), self.bond_score, new_annotation)
         self.children.append(new_child)
 
     def get_best(self):
-        return sorted(self.get_leaves(), key=lambda iteration: (iteration.r1, len(iteration.res_file.mixed_site_numbers)))[0]
+        return sorted(self.get_leaves(), key=lambda iteration: iteration.overall_score)[0]
 
 
 class OptimizerHistory:

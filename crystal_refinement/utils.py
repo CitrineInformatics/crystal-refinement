@@ -41,7 +41,8 @@ def score_compound_bonds(bonds, use_ml_model=False):
     :param use_ml_model:
     :return:
     """
-    return -sum([x[1] for x in site_mixing_priority(bonds, 2, use_ml_model)])
+    bond_scores = [x[1] for x in site_mixing_priority(bonds, 2, use_ml_model)]
+    return -sum(bond_scores)/len(bond_scores)
 
 def get_bond_score(bond, use_ml_model=False):
     """
