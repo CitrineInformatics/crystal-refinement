@@ -35,7 +35,11 @@ class OptimizerIteration:
     def get_leaves(self):
         leaves = []
         if len(self.children) == 0:
-            return [self]
+            if self.dead_branch:
+                return []
+            else:
+                return [self]
+
         for child in self.children:
             leaves.extend(child.get_leaves())
         return leaves
@@ -63,12 +67,15 @@ class OptimizerIteration:
         if len(self.children) == 0:
             if self == best:
                 highlight = True
+        color = "black"
         if highlight:
-            dot.node(node_label, str(self.r1), color="green")
-            dot.edge(parent_label, node_label, color="green", label=self.annotation)
-        else:
-            dot.node(node_label, str(self.r1))
-            dot.edge(parent_label, node_label, label=self.annotation)
+            color = "green"
+        if self.dead_branch:
+            color = "red"
+
+        dot.node(node_label, str(self.r1), color=color)
+        dot.edge(parent_label, node_label, color=color, label=self.annotation)
+
         return highlight
 
 
@@ -77,23 +84,27 @@ class OptimizerIteration:
         new_annotation = None
         if self.annotation is not None:
             new_annotation = "Propagated from previous generation"
-        new_child = OptimizerIteration(self, self.get_ins(), self.get_res(), new_annotation)
+        new_child = OptimizerIteration(self, self.get_ins(), self.get_res(), self.bond_score, new_annotation)
         self.children.append(new_child)
 
+    def get_sorted_leaves(self):
+        return sorted(self.get_leaves(), key=lambda iteration: (iteration.r1, len(iteration.res_file.mixed_site_numbers)))
+
     def get_best(self):
-        return sorted(self.get_leaves(), key=lambda iteration: (iteration.r1, len(iteration.res_file.mixed_site_numbers)))[0]
+        return self.get_sorted_leaves()[0]
 
 
 class OptimizerHistory:
     """
     Define class to hold information optimizer history information
     """
-    def __init__(self, driver, ins_file):
+    def __init__(self, driver, ins_file, max_n_leaves=10):
         self.driver = driver
         res = self.driver.run_SHELXTL(ins_file)
         bonds = utils.get_bonds(self.driver, res)
-        self.head = OptimizerIteration(None, ins_file, res, utils.score_compound_bonds(bonds))
+        self.head = OptimizerIteration(None, ins_file, res, utils.score_compound_bonds(bonds, ins_file))
         self.leaves = [self.head]
+        self.max_n_leaves = max_n_leaves
 
     def run_iter(self, ins_file, parent_iteration, annotation=None):
         """
@@ -105,9 +116,23 @@ class OptimizerHistory:
         res = self.driver.run_SHELXTL(ins_file)
         if res is None:
             return None
-        bonds = utils.get_bonds(self.driver, res)
-        new_iter = OptimizerIteration(parent_iteration, ins_file, res, utils.score_compound_bonds(bonds), annotation)
+        # If refinement is unstable, no cif file will be generated. The iteration should fail then
+        try:
+            bonds = utils.get_bonds(self.driver, res)
+        except IndexError:
+            return None
+        new_iter = OptimizerIteration(parent_iteration, ins_file, res, utils.score_compound_bonds(bonds, ins_file), annotation)
         return new_iter
+
+    def clean_history(self):
+        if len(self.leaves) > self.max_n_leaves:
+            sorted_leaves = self.head.get_sorted_leaves()
+            for i in range(self.max_n_leaves, len(self.leaves)):
+                # print "Dropping leaf: "
+                # print sorted_leaves[i].ins_file.get_crystal_sites_text()
+                sorted_leaves[i].dead_branch = True
+            self.update_leaves()
+
 
     def save(self, iterations):
         if not isinstance(iterations, list):

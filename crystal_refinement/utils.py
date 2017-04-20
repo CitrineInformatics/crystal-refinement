@@ -47,7 +47,7 @@ def score_compound_bonds(bonds, shelx_file, use_ml_model=False):
     for site_name, score in site_bond_scores:
         stoich = 0
         for site in shelx_file.crystal_sites:
-            if site.name == site_name:
+            if site.name.capitalize() == site_name:
                 stoich = shelx_file.get_site_stoichiometry(site)
         total_stoich += stoich
         stoich_weighted_score += stoich * score

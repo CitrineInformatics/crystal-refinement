@@ -12,6 +12,7 @@ class CrystalSite:
         :param line_list:
         """
         self.name = None   # For example, this might be Fe1
+        self.el_string = None
         self.site_number = None   # This would be 1 if the name is Fe1
         self.position = None  # This will be a 1X3 numpy array with the x, y, z coordinates
         self.occupancy_prefix = None  # This is a 1 in the case of fixed occupancy
@@ -42,6 +43,7 @@ class CrystalSite:
         # Handles assigned sites:
         else:
             self.name = line_list[0]
+            self.el_string = re.sub("\d+", "", self.name)
             self.site_number = int(re.search('\d+', self.name).group(0))
             self.element = int(line_list[1])
             self.position = np.asarray([float(line_list[2]), float(line_list[3]), float(line_list[4])])
@@ -60,7 +62,7 @@ class CrystalSite:
         ['SM2', '4', '0.153587', '0.000000', '0.432975', '10.500000', '0.006020']
 
         """
-        line_list = [self.name, str(self.element)]
+        line_list = [self.el_string + str(self.site_number), str(self.element)]
         line_list += ['{:.6f}'.format(x) for x in self.position.tolist()]
         line_list += [str(self.occupancy_prefix) + '{:.6f}'.format(self.occupancy)]
         line_list += ['{:.6f}'.format(self.displacement)]

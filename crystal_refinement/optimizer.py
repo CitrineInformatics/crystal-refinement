@@ -1,5 +1,5 @@
 from SHELXDriver import SHELXDriver
-import os, re, copy, math, itertools, random
+import os, re, copy, math, itertools, random, time
 import numpy as np
 import shutil
 from pymatgen.core.composition import Element
@@ -12,7 +12,7 @@ class Optimizer:
     Class for performing single crystal refinement
     """
     def __init__(self, r1_similarity_threshold=0.0025, occupancy_threshold=0.02, r1_threshold=0.1,
-                 least_squares_iterations=10, use_ml_model=False):
+                 least_squares_iterations=4, use_ml_model=False):
         """
         :param r1_similarity_threshold: If r1 scores for multiple options are within this similarity threshold, the
             optimizer will branch and explore all the options.
@@ -48,7 +48,7 @@ class Optimizer:
 
         # Check that the ins file is direct from xprep, without having been run before
         f = open(output_prefix + ".ins")
-        assert len(f.readlines()) < 15, "Error: Must run optimizer directly on output from xprep, without other changes"
+        # assert len(f.readlines()) < 15, "Error: Must run optimizer directly on output from xprep, without other changes"
 
         # Run first iteration using xs
         self.driver.run_SHELXTL_command(cmd="xs")
@@ -63,10 +63,10 @@ class Optimizer:
         # Optimization
         self.run_step(self.identify_sites)
         self.run_step(self.switch_elements)
-        # quit()
         # There is currently an inherent assumption that switch elements will never be called after site mixing, since
         # after site mixing, the indices don't line up anymore
         self.run_step(self.try_site_mixing)
+
         self.run_step(self.change_occupancy)
         self.run_step(self.try_exti)
         self.run_step(self.try_anisotropy)
@@ -123,7 +123,8 @@ class Optimizer:
             annotation = "Added q peak"
         ins_file = initial.get_res()
         # This threshold could be scaled based on the potential atoms
-        if ins_file.q_peaks[0].electron_density > 50:
+        lightest_element = min([Element(el.capitalize()).number for el in ins_file.elements])
+        if ins_file.q_peaks[0].electron_density > lightest_element:
             ins_file.move_q_to_crystal()
             # Find best element for new site
             num_elems = len(ins_file.elements)
@@ -135,7 +136,7 @@ class Optimizer:
                     iterations.append(iteration)
             iterations.sort(key=lambda i: i.r1)
             best_iter = iterations[0]
-            displacements = [x.displacement for x in best_iter.crystal_sites]
+            displacements = [x.displacement for x in best_iter.res_file.crystal_sites]
             if best_iter.r1 < initial.r1 and displacements[-1] < (np.mean(displacements[:-1]) + 2.0 * np.std(displacements[:-1])):
                 self.history.save([iterations[0]])
                 for leaf in initial.get_leaves():
@@ -168,6 +169,7 @@ class Optimizer:
             if len(to_delete) == 0:
                 break
             ins_file.remove_sites_by_number(to_delete)
+            ins_file.renumber_sites()
             if self.annotate_graph:
                 cur_iter = self.history.run_iter(ins_file, initial, "Removed {} site(s)".format(len(to_delete)))
             else:
@@ -184,7 +186,8 @@ class Optimizer:
         sorted_sites = sorted(ins_file.crystal_sites, key=lambda s: -s.displacement)
         order = [s.site_number - 1 for s in sorted_sites]
         num_elems = len(ins_file.elements)
-        # print "\n".join([" ".join(s.write_line()) for s in initial.ins_file.crystal_sites])
+
+        # print ins_file.get_crystal_sites_text()
         for i in order:
             for prev_iter in initial.get_leaves():
                 ins_file = prev_iter.get_res()
@@ -200,13 +203,15 @@ class Optimizer:
                     if iteration is not None:
                         iterations.append(iteration)
                 iterations.sort(key=lambda i: i.r1)
-                print prev_iter.res_file.crystal_sites[i].name
+                # print prev_iter.res_file.crystal_sites[i].name
                 for iteration in iterations:
-                    print iteration.ins_file.crystal_sites[i].name, iteration.r1, iteration.bond_score, iteration.overall_score
+                    # print iteration.ins_file.crystal_sites[i].name, iteration.r1, iteration.bond_score, iteration.overall_score
                     if iteration.r1 - iterations[0].r1 < self.r1_similarity_threshold:
+                        # print "saved"
                         self.history.save(iteration)
-                print "#"*50
-        quit()
+            self.history.clean_history()
+                # print "#"*50
+        # quit()
 
     def change_occupancy(self, initial):
         ins_file = initial.get_res()
@@ -259,8 +264,12 @@ class Optimizer:
             e1 = element_list[i1]
             e2 = element_list[i2]
             sp = utils.get_substitution_probability(e1, e2)
+            # print e1, e2, sp
             if sp > probability_threshold:
                 pairs.append(([i1, i2], sp))
+        # quit()
+
+        pairs.append(([0, 1], probability_threshold))
 
         # Sort pairs by substitution probability (largest to smallest)
         pairs = [tup[0] for tup in sorted(pairs, key=lambda tup: -tup[1])]
@@ -326,8 +335,13 @@ class Optimizer:
         else:
             iteration = self.history.run_iter(ins_file, initial)
         #  If anisotropy helped, add it to the history
-        if iteration is not None and iteration.r1 < initial.r1:
+        # if iteration is not None and iteration.r1 < initial.r1:
+        #     self.history.save(iteration)
+
+        if iteration is not None:
             self.history.save(iteration)
+            if iteration.r1 > initial.r1:
+                initial.propagate()
 
     def try_exti(self, initial):
         """
@@ -344,8 +358,12 @@ class Optimizer:
             iteration = self.history.run_iter(ins_file, initial)
 
         #  If exti helped, add it to the history
-        if iteration is not None and iteration.r1 < initial.r1:
+        # if iteration is not None and iteration.r1 < initial.r1:
+        #     self.history.save(iteration)
+        if iteration is not None:
             self.history.save(iteration)
+            if iteration.r1 > initial.r1:
+                initial.propagate()
 
     def use_suggested_weights(self, initial):
         """
@@ -362,9 +380,14 @@ class Optimizer:
         else:
             iteration = self.history.run_iter(ins_file, initial)
 
-        #  If exti helped, add it to the history
-        if iteration is not None and iteration.r1 < initial.r1:
+        #  If weights helped, add it to the history
+        # if iteration is not None and iteration.r1 < initial.r1:
+        #     self.history.save(iteration)
+
+        if iteration is not None:
             self.history.save(iteration)
+            if iteration.r1 > initial.r1:
+                initial.propagate()
 
 
 ########################################################################################################################
@@ -374,7 +397,7 @@ def test_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix
              generate_graph=False, annotate_graph=False, graph_path=""):
     subdirs = os.listdir(ins_folder)
     for dirname in subdirs:
-        if dirname[0] != ".":
+        if dirname[0] != "." and dirname[0] != "!":
             print dirname
             test_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix, use_wine,
                         print_files, generate_graph, annotate_graph, graph_path)
@@ -382,29 +405,42 @@ def test_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix
 
 def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix="temp", use_wine=False, print_files=False,
                 generate_graph=False, annotate_graph=False, graph_path=""):
-    try:
-        ins_path = os.path.join(dirname, "work")
-        for filename in os.listdir(os.path.join(dirname, "Anton")):
-            if ".hkl" in filename:
-                shutil.copy(os.path.join(dirname, "Anton", filename),
-                            os.path.join(ins_path, input_prefix + ".hkl"))
-            if ".res" in filename:
-                final_res = os.path.join(dirname, "Anton", filename)
-    except Exception:
+    if "INS-HKL" in os.listdir(dirname):
+        ins_path = os.path.join(dirname, "INS-HKL")
+        final_res = os.path.join(dirname, "INS-HKL", "result.res")
+        graph_name = os.path.basename(dirname)
+        ins_from_result(ins_path)
+    else:
         try:
-            ins_path = dirname
-            open(os.path.join(dirname, "1.hkl"))
-            open(os.path.join(dirname, "1.ins"))
-            final_res = os.path.join(dirname, "result.res")
-            open(final_res)
-        except Exception, e:
-            print "File structure failure", e
-            print "~" * 50
-            return
+            ins_path = os.path.join(dirname, "work")
+            graph_name = os.path.basename(ins_path)
+            for filename in os.listdir(os.path.join(dirname, "Anton")):
+                if ".hkl" in filename:
+                    shutil.copy(os.path.join(dirname, "Anton", filename),
+                                os.path.join(ins_path, input_prefix + ".hkl"))
+                if ".res" in filename:
+                    final_res = os.path.join(dirname, "Anton", filename)
+        except Exception:
+            try:
+                ins_path = dirname
+                open(os.path.join(dirname, "1.hkl"))
+                open(os.path.join(dirname, "1.ins"))
+                final_res = os.path.join(dirname, "result.res")
+                open(final_res)
+            except Exception, e:
+                print "File structure failure", e
+                print "~" * 50
+                return
 
-
+    # try:
+    start = time.time()
     opt = run_single(path_to_SXTL_dir, ins_path, input_prefix, output_prefix, use_wine,
-                     generate_graph, annotate_graph, graph_path)
+                     generate_graph, annotate_graph, graph_path, graph_name)
+    runtime = time.time() - start
+    # except Exception, e:
+    #     print "Optimizer failure:", e
+    #     print "~" * 50
+    #     return
 
     best_history = opt.history.get_best_history()
 
@@ -414,6 +450,7 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
     print "Initial r1 = {}".format(best_history[0].r1)
     print "Optimizer r1 = {}".format(best_history[-1].r1)
     print "Reference r1 = {}".format(anton_r1)
+    print "Runtime = {}s".format(runtime)
     if best_history[-1].r1 - anton_r1 > r1_tol:
         print "Not success!"
     if print_files:
@@ -425,12 +462,12 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
 
 
 def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix="temp", use_wine=False,
-               generate_graph=False, annotate_graph=False, graph_path=""):
+               generate_graph=False, annotate_graph=False, graph_path="", graph_name="out"):
     opt = Optimizer()
     opt.run(os.path.join(path_to_SXTL_dir, "xl.exe"), os.path.join(path_to_SXTL_dir, "xs.exe"), ins_path, input_prefix, output_prefix, use_wine=use_wine,
             annotate_graph=annotate_graph)
     if generate_graph:
-        opt.history.head.generate_graph(os.path.join(graph_path, os.path.basename(ins_path)))
+        opt.history.head.generate_graph(os.path.join(graph_path, graph_name))
     return opt
 
 
@@ -447,17 +484,43 @@ def run_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix=
             print "Initial r1: {}".format(best_history[0].r1)
             print "Final r1: {}".format(best_history[-1].r1)
 
+
+def ins_from_result(folder_path, result_file="result.res", input_prefix="1"):
+    from collections import defaultdict
+    lines = defaultdict(lambda: [])
+    lines["TREF"].append("\n")
+
+
+    with open(os.path.join(folder_path, result_file)) as f:
+        for line in f:
+            split = line.split()
+            if len(split) == 1:
+                lines[split[0]].append("\n")
+            elif len(split) > 1:
+                lines[split[0]].append(line[len(split[0]):])
+
+
+    keys = ["TITL", "CELL", "ZERR", "LATT", "SYMM", "SFAC", "UNIT", "TEMP", "SIZE", "TREF", "HKLF", "END"]
+    with open(os.path.join(folder_path, input_prefix + ".ins"), 'w') as f:
+        for key in keys:
+            values = lines[key]
+            for val in values:
+                f.write("{} {}".format(key, val))
+
+
+
 def main():
     path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
     # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/4-2-1-4 INS and HKL files"
-    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
-    subdir = "Nd4Mn2AgGe4crystal"
+    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
+    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data1/MIXING"
+    subdir = "!Ba5CdGa6Se15"
     graph_output_path = "/Users/eantono/Documents/src/xtal_refinement/output"
     # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
     # ins_folder = "/Users/julialing/Documents/DataScience/crystal_refinement/single_crystal_data/"
 
     # test_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True, print_files=False,
-    #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
+    #   generate_graph=False, annotate_graph=False, graph_path=graph_output_path)
     test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True, print_files=True,
       generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
     # run_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True,

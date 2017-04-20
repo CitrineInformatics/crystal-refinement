@@ -56,12 +56,13 @@ class SHELXFile:
 
         # Second text section, break at PLAN line
         self.extra_text_section = 1
+        header_keys = ["TITL","CELL","ZERR","LATT","SYMM","SYMM","SYMM","SYMM","SYMM","SFAC","UNIT","TEMP","SIZE"]
         while True:
+            if re.match("^\s*$", line) is None and all([key not in line for key in header_keys]):
+                break
             line = lines[line_idx]
             self.extra_text[self.extra_text_section] += line + "\n"
             line_idx += 1
-            if "SIZE" in line:
-                break
 
         line_idx += 1
 
@@ -157,12 +158,8 @@ class SHELXFile:
         Remove command
         :param cmd: command to remove
         """
-        cmd_keys = map(lambda tup: tup[0], self.commands)
-        if cmd in cmd_keys:
-            indices = [i for i, val in enumerate(cmd_keys) if val is cmd]
-            indices.reverse()
-            for i in indices:
-                del self.commands[i]
+        self.commands = [(k, v) for k, v in self.commands if k != cmd]
+
 
     def add_anisotropy(self):
         self.add_command("ANIS")
@@ -200,6 +197,7 @@ class SHELXFile:
         """
         site = self.get_crystal_sites_by_number(site_index + 1)[0]
         self.crystal_sites[site].element = element_index
+        self.crystal_sites[site].el_string = self.elements[element_index - 1]
         self.crystal_sites[site].name = self.elements[element_index-1] + str(site_index+1)
 
     def move_q_to_crystal(self):
@@ -227,6 +225,20 @@ class SHELXFile:
         :return:
         """
         self.crystal_sites = [site for site in self.crystal_sites if site.site_number not in site_numbers]
+
+    def renumber_sites(self):
+        """
+        Renumbers the sites to consecutive integers
+        :return:
+        """
+        renumbered = 0
+        cur_site_number = None
+        for site in self.crystal_sites:
+            # Indexed from 1, so the first iteration will trigger this
+            if cur_site_number != site.site_number:
+                cur_site_number = site.site_number
+                renumbered += 1
+            site.site_number = renumbered
 
     def add_variable_occupancy(self, site_index):
         """
