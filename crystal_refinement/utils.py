@@ -106,7 +106,6 @@ def get_ideal_bond_length(specie_name1, specie_name2, ml_model=None):
     """
     if ml_model is not None:
         pass
-        ml_model.custom_predict()
 
     # Use pymatgen to get approximate bond length = sum of atomic radii
     el1 = Element(re.sub('\d', "", specie_name1))
