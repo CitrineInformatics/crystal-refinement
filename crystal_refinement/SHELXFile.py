@@ -74,7 +74,7 @@ class SHELXFile:
                 split = line.split()
                 key = split[0]
                 if key == "FVAR":
-                    self.fvar_vals = split[1:]
+                    self.fvar_vals = [float(x) for x in split[1:]]
                 elif len(split) == 1:
                     self.commands.append((key, None))
                 else:
@@ -176,15 +176,15 @@ class SHELXFile:
     def get_site_stoichiometry(self, crystal_site):
         prefix = 1
         if crystal_site.occupancy_prefix < 0:
-            prefix = 1.0 - float(self.fvar_vals[-1 * crystal_site.occupancy_prefix - 1])
+            prefix = 1.0 - self.fvar_vals[-1 * crystal_site.occupancy_prefix - 1]
         if crystal_site.occupancy_prefix > 1:
-            prefix = float(self.fvar_vals[crystal_site.occupancy_prefix - 1])
+            prefix = self.fvar_vals[crystal_site.occupancy_prefix - 1]
         return crystal_site.occupancy * prefix
 
     def get_analytic_formula(self):
         formula = ""
         for site in self.crystal_sites:
-            el = site.name.replace(str(site.site_number), "")
+            el = site.element
             stoich = self.get_site_stoichiometry(site)
             formula += el + stoich
         return formula
@@ -198,7 +198,7 @@ class SHELXFile:
         site = self.get_crystal_sites_by_number(site_index + 1)[0]
         self.crystal_sites[site].element = element_index
         self.crystal_sites[site].el_string = self.elements[element_index - 1]
-        self.crystal_sites[site].name = self.elements[element_index-1] + str(site_index+1)
+        self.crystal_sites[site].site_index = str(site_index+1)
 
     def move_q_to_crystal(self):
         """
@@ -270,7 +270,8 @@ class SHELXFile:
         mixed_sites = []
         for i, element_idx in enumerate(mixing_element_indices):
             new_site = copy.deepcopy(self.crystal_sites[site_indices[0]])
-            new_site.name = self.elements[element_idx] + str(site_number)
+            new_site.el_string = self.elements[element_idx]
+            new_site.site_number = str(site_number)
             new_site.element = element_idx + 1  # Because elements are 1-indexed
             if i == 0:
                 new_site.occupancy_prefix = len(self.fvar_vals)

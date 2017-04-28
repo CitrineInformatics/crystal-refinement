@@ -5,6 +5,7 @@ import shutil
 from pymatgen.core.composition import Element
 import utils
 from OptimizerHistory import OptimizerHistory
+from citrination_client import CitrinationClient
 
 
 class Optimizer:
@@ -26,7 +27,10 @@ class Optimizer:
         self.r1_threshold = r1_threshold
         self.occupancy_threshold = occupancy_threshold
         self.least_squares_iterations = least_squares_iterations
-        self.use_ml_model = use_ml_model
+        self.ml_model = None
+        if use_ml_model:
+            self.ml_model = CitrinationClient(os.environ["CITRINATION_API_KEY"])
+
 
     def run(self, path_to_xl, path_to_xs, ins_path, input_prefix, output_prefix, use_wine=False, annotate_graph=False):
         """
@@ -85,6 +89,7 @@ class Optimizer:
 
     def identify_sites(self, initial):
         if initial.r1 > self.r1_threshold:
+            self.try_add_q(initial)
             self.identify_sites_by_bond_length(initial)
         else:
             self.try_add_q(initial)
@@ -137,7 +142,7 @@ class Optimizer:
             iterations.sort(key=lambda i: i.r1)
             best_iter = iterations[0]
             displacements = [x.displacement for x in best_iter.res_file.crystal_sites]
-            if best_iter.r1 < initial.r1 and displacements[-1] < (np.mean(displacements[:-1]) + 2.0 * np.std(displacements[:-1])):
+            if best_iter.r1 < initial.r1: #and displacements[-1] < (np.mean(displacements[:-1]) + 2.0 * np.std(displacements[:-1])):
                 self.history.save([iterations[0]])
                 for leaf in initial.get_leaves():
                     #   If adding one peak helped, recursively try adding another peak until it stops helping
@@ -159,7 +164,7 @@ class Optimizer:
             ins_file = initial.get_res()
             to_delete = set()
             for a1, a2, distance in bonds:
-                ideal_distance = utils.get_ideal_bond_length(a1, a2, self.use_ml_model)
+                ideal_distance = utils.get_ideal_bond_length(a1, a2, self.ml_model)
                 # if the distance is too small, remove the lower density atom
                 if (ideal_distance - distance) / ideal_distance > threshold:
                     a1_num = int(re.search('\d+', a1).group(0))
@@ -195,17 +200,17 @@ class Optimizer:
                 for elem in range(1, num_elems+1):
                     ins_file.change_element(i, elem)
                     if self.annotate_graph:
-                        prev = prev_iter.res_file.crystal_sites[i].name
-                        cur = ins_file.crystal_sites[i].name
+                        prev = prev_iter.res_file.crystal_sites[i].get_name()
+                        cur = ins_file.crystal_sites[i].get_name()
                         iteration = self.history.run_iter(ins_file, prev_iter, "Changed {} to {}".format(prev, cur))
                     else:
                         iteration = self.history.run_iter(ins_file, prev_iter)
                     if iteration is not None:
                         iterations.append(iteration)
                 iterations.sort(key=lambda i: i.r1)
-                # print prev_iter.res_file.crystal_sites[i].name
+                # print prev_iter.res_file.crystal_sites[i].get_name()
                 for iteration in iterations:
-                    # print iteration.ins_file.crystal_sites[i].name, iteration.r1, iteration.bond_score, iteration.overall_score
+                    # print iteration.ins_file.crystal_sites[i].get_name(), iteration.r1, iteration.bond_score, iteration.overall_score
                     if iteration.r1 - iterations[0].r1 < self.r1_similarity_threshold:
                         # print "saved"
                         self.history.save(iteration)
@@ -234,7 +239,7 @@ class Optimizer:
 
                 ins_file.add_variable_occupancy(i)
                 if self.annotate_graph:
-                    site = ins_file.crystal_sites[i].name
+                    site = ins_file.crystal_sites[i].get_name()
                     iteration = self.history.run_iter(ins_file, initial, "Added variable occupancy for {}".format(site))
                 else:
                     iteration = self.history.run_iter(ins_file, initial)
@@ -267,9 +272,6 @@ class Optimizer:
             # print e1, e2, sp
             if sp > probability_threshold:
                 pairs.append(([i1, i2], sp))
-        # quit()
-
-        pairs.append(([0, 1], probability_threshold))
 
         # Sort pairs by substitution probability (largest to smallest)
         pairs = [tup[0] for tup in sorted(pairs, key=lambda tup: -tup[1])]
@@ -277,6 +279,7 @@ class Optimizer:
         # Keep adding site mixing until we've already tried adding site mixing at the top priority sites
         tried = set()
         self.do_site_mixing(initial, tried, pairs)
+        # quit()
 
     def do_site_mixing(self, initial, tried, pairs):
         ins_file = initial.get_res()
@@ -285,7 +288,6 @@ class Optimizer:
         # In case of ties, find all top tied priorities
         top_priority_score = mixing_priority[0][1]
         top_priority = [priority[0] for priority in mixing_priority if priority[1] - top_priority_score < 0.5]
-
         # For each of these top priorities, try site mixing
         if all([i in tried for i in top_priority]):
             return
@@ -308,6 +310,7 @@ class Optimizer:
                         # Only include occupancies that are actually split
                         if occupancy_var > self.occupancy_threshold and occupancy_var < (1 - self.occupancy_threshold):
                             iterations.append(iteration)
+
                 if len(iterations) == 0:
                     continue
                 iterations.sort(key=lambda i: i.r1)
@@ -397,7 +400,7 @@ def test_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix
              generate_graph=False, annotate_graph=False, graph_path=""):
     subdirs = os.listdir(ins_folder)
     for dirname in subdirs:
-        if dirname[0] != "." and dirname[0] != "!":
+        if dirname[0] != "." and "mar" in dirname:
             print dirname
             test_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix, use_wine,
                         print_files, generate_graph, annotate_graph, graph_path)
@@ -407,13 +410,18 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
                 generate_graph=False, annotate_graph=False, graph_path=""):
     if "INS-HKL" in os.listdir(dirname):
         ins_path = os.path.join(dirname, "INS-HKL")
-        final_res = os.path.join(dirname, "INS-HKL", "result.res")
+        final_res = ""
+        for filename in sorted(os.listdir(ins_path), key=lambda name: os.path.getctime(os.path.join(ins_path, name))):
+            if ".res" in filename:
+                final_res = os.path.join(dirname, "INS-HKL", filename)
+                break
         graph_name = os.path.basename(dirname)
-        ins_from_result(ins_path)
+        input_prefix = os.path.basename(final_res).split(".")[0]
+        ins_from_result(ins_path, result_file=os.path.basename(final_res), input_prefix=input_prefix)
     else:
         try:
             ins_path = os.path.join(dirname, "work")
-            graph_name = os.path.basename(ins_path)
+            graph_name = os.path.basename(dirname)
             for filename in os.listdir(os.path.join(dirname, "Anton")):
                 if ".hkl" in filename:
                     shutil.copy(os.path.join(dirname, "Anton", filename),
@@ -423,6 +431,7 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
         except Exception:
             try:
                 ins_path = dirname
+                graph_name = os.path.basename(dirname)
                 open(os.path.join(dirname, "1.hkl"))
                 open(os.path.join(dirname, "1.ins"))
                 final_res = os.path.join(dirname, "result.res")
@@ -433,6 +442,7 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
                 return
 
     # try:
+
     start = time.time()
     opt = run_single(path_to_SXTL_dir, ins_path, input_prefix, output_prefix, use_wine,
                      generate_graph, annotate_graph, graph_path, graph_name)
@@ -513,16 +523,16 @@ def main():
     path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
     # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/4-2-1-4 INS and HKL files"
     # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
-    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data1/MIXING"
-    subdir = "!Ba5CdGa6Se15"
+    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data2/EASY"
+    subdir = "!solid_solution-Nd4Mn2CdSi2.5Ge1.5"
     graph_output_path = "/Users/eantono/Documents/src/xtal_refinement/output"
     # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
     # ins_folder = "/Users/julialing/Documents/DataScience/crystal_refinement/single_crystal_data/"
 
-    # test_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True, print_files=False,
-    #   generate_graph=False, annotate_graph=False, graph_path=graph_output_path)
-    test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True, print_files=True,
-      generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
+    test_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True, print_files=False,
+      generate_graph=False, annotate_graph=False, graph_path=graph_output_path)
+    # test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True, print_files=True,
+    #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
     # run_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True,
     #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
     # run_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True,

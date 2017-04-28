@@ -83,7 +83,10 @@ class SHELXDriver:
             return False
         if os.path.getsize(self.res_file) < 1.0:
             return False
-        res_file = self.get_res_file()
+        try:
+            res_file = self.get_res_file()
+        except Exception:
+            return False
         if len(res_file.q_peaks) == 0:
             return False
         return True

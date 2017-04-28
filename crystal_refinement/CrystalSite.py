@@ -11,9 +11,8 @@ class CrystalSite:
 
         :param line_list:
         """
-        self.name = None   # For example, this might be Fe1
-        self.el_string = None
-        self.site_number = None   # This would be 1 if the name is Fe1
+        self.el_string = None # This would be FE if the name is FE1
+        self.site_number = None   # This would be 1 if the name is FE1
         self.position = None  # This will be a 1X3 numpy array with the x, y, z coordinates
         self.occupancy_prefix = None  # This is a 1 in the case of fixed occupancy
         self.occupancy = None  # This number depends on the site symmetry.  Often it is 0.5
@@ -31,8 +30,8 @@ class CrystalSite:
         """
         #  Handle Q peaks:
         if line_list[0][0] == "Q":
-            self.name = line_list[0]
-            self.site_number = int(re.search('\d+', self.name).group(0))
+            self.el_string = "Q"
+            self.site_number = int(re.search('\d+', line_list[0]).group(0))
             self.element = int(line_list[1])
             self.position = np.asarray([float(line_list[2]), float(line_list[3]), float(line_list[4])])
             self.occupancy_prefix = int(line_list[5][0])
@@ -42,9 +41,8 @@ class CrystalSite:
 
         # Handles assigned sites:
         else:
-            self.name = line_list[0]
-            self.el_string = re.sub("\d+", "", self.name)
-            self.site_number = int(re.search('\d+', self.name).group(0))
+            self.el_string = re.sub("\d+", "", line_list[0])
+            self.site_number = int(re.search('\d+', line_list[0]).group(0))
             self.element = int(line_list[1])
             self.position = np.asarray([float(line_list[2]), float(line_list[3]), float(line_list[4])])
             self.occupancy_prefix = int(line_list[5][:(line_list[5].index(".") - 1)])
@@ -52,6 +50,9 @@ class CrystalSite:
             self.displacement = float(line_list[6])
             if len(line_list) > 7:
                 self.anisotropy = np.asarray([float(x) for x in line_list[7:]])
+
+    def get_name(self):
+        return self.el_string + str(self.site_number)
 
     def write_line(self):
         """
@@ -66,7 +67,7 @@ class CrystalSite:
         line_list += ['{:.6f}'.format(x) for x in self.position.tolist()]
         line_list += [str(self.occupancy_prefix) + '{:.6f}'.format(self.occupancy)]
         line_list += ['{:.6f}'.format(self.displacement)]
-        if (self.name[0] == "Q"):
+        if (self.el_string == "Q"):
             line_list += ['{:.6f}'.format(self.electron_density)]
         if (self.anisotropy is not None):
             line_list += ['=\n'] + ['{:.6f}'.format(x) for x in self.anisotropy.tolist()]
