@@ -57,9 +57,7 @@ class OptimizerSteps:
         Try adding q peaks to main crystal sites if it decreases R value
         :return:
         """
-        annotation = None
-        if self.optimizer.annotate_graph:
-            annotation = "Added q peak"
+        annotation = "Added q peak"
         ins_file = initial.get_res()
         # This threshold could be scaled based on the potential atoms
         lightest_element = min([Element(el.capitalize()).number for el in ins_file.elements])
@@ -111,10 +109,9 @@ class OptimizerSteps:
                 break
             ins_file.remove_sites_by_number(to_delete)
             ins_file.renumber_sites()
-            if self.optimizer.annotate_graph:
-                cur_iter = self.optimizer.history.run_iter(ins_file, initial, "Removed {} site(s)".format(len(to_delete)))
-            else:
-                cur_iter = self.optimizer.history.run_iter(ins_file, initial)
+
+            cur_iter = self.optimizer.history.run_iter(ins_file, initial, "Removed {} site(s)".format(len(to_delete)))
+
             if cur_iter is not None and cur_iter.r1 < initial.r1 * r_penalty:
                 self.optimizer.history.save(cur_iter)
                 break
@@ -137,12 +134,11 @@ class OptimizerSteps:
                 iterations = []
                 for elem in range(1, num_elems + 1):
                     ins_file.change_element(i, elem)
-                    if self.optimizer.annotate_graph:
-                        prev = prev_iter.res_file.crystal_sites[i].get_name()
-                        cur = ins_file.crystal_sites[i].get_name()
-                        iteration = self.optimizer.history.run_iter(ins_file, prev_iter, "Changed {} to {}".format(prev, cur))
-                    else:
-                        iteration = self.optimizer.history.run_iter(ins_file, prev_iter)
+
+                    prev = prev_iter.res_file.crystal_sites[i].get_name()
+                    cur = ins_file.crystal_sites[i].get_name()
+                    iteration = self.optimizer.history.run_iter(ins_file, prev_iter, "Changed {} to {}".format(prev, cur))
+
                     if iteration is not None:
                         iterations.append(iteration)
                 iterations.sort(key=lambda i: i.r1)
@@ -177,11 +173,10 @@ class OptimizerSteps:
                     break
 
                 ins_file.add_variable_occupancy(i)
-                if self.optimizer.annotate_graph:
-                    site = ins_file.crystal_sites[i].get_name()
-                    iteration = self.optimizer.history.run_iter(ins_file, initial, "Added variable occupancy for {}".format(site))
-                else:
-                    iteration = self.optimizer.history.run_iter(ins_file, initial)
+
+                site = ins_file.crystal_sites[i].get_name()
+                iteration = self.optimizer.history.run_iter(ins_file, initial, "Added variable occupancy for {}".format(site))
+
 
                 # If changing the occupancy decreased r1, decreased the displacement, and resulted in an occupancy
                 # that satisfies the threshold, add it to the history
@@ -225,11 +220,11 @@ class OptimizerSteps:
                 for pair in pairs:
                     ins_file = prev_iter.get_res()
                     ins_file.add_site_mixing(site_number=i, mixing_element_indices=pair)
-                    if self.optimizer.annotate_graph:
-                        mix = "{} and {}".format(ins_file.elements[pair[0]], ins_file.elements[pair[1]])
-                        iteration = self.optimizer.history.run_iter(ins_file, prev_iter, "Mixing {} on site {}".format(mix, i))
-                    else:
-                        iteration = self.optimizer.history.run_iter(ins_file, prev_iter)
+
+                    # Graph annotation
+                    mix = "{} and {}".format(ins_file.elements[pair[0]], ins_file.elements[pair[1]])
+                    iteration = self.optimizer.history.run_iter(ins_file, prev_iter, "Mixing {} on site {}".format(mix, i))
+
                     if iteration is not None:
                         occupancy_var = float(iteration.res_file.fvar_vals[-1])
                         # Only include occupancies that are actually split
@@ -259,10 +254,9 @@ class OptimizerSteps:
 
         #  Try with anisotropy
         ins_file.add_anisotropy()
-        if self.optimizer.annotate_graph:
-            iteration = self.optimizer.history.run_iter(ins_file, initial, "Added anisotropy")
-        else:
-            iteration = self.optimizer.history.run_iter(ins_file, initial)
+
+        iteration = self.optimizer.history.run_iter(ins_file, initial, "Added anisotropy")
+
         # If anisotropy helped, add it to the history
         # if iteration is not None and iteration.r1 < initial.r1:
         #     self.optimizer.history.save(iteration)
@@ -282,10 +276,9 @@ class OptimizerSteps:
 
         #  Try with extinguishing
         ins_file.add_exti()
-        if self.optimizer.annotate_graph:
-            iteration = self.optimizer.history.run_iter(ins_file, initial, "Added extinction")
-        else:
-            iteration = self.optimizer.history.run_iter(ins_file, initial)
+
+        iteration = self.optimizer.history.run_iter(ins_file, initial, "Added extinction")
+
 
         # If exti helped, add it to the history
         if iteration is not None:
@@ -304,10 +297,9 @@ class OptimizerSteps:
         #  Try with suggested
         ins_file.remove_command("WGHT")
         ins_file.commands.append(("WGHT", ins_file.suggested_weight_vals))
-        if self.optimizer.annotate_graph:
-            iteration = self.optimizer.history.run_iter(ins_file, initial, "Used suggested weights")
-        else:
-            iteration = self.optimizer.history.run_iter(ins_file, initial)
+
+        iteration = self.optimizer.history.run_iter(ins_file, initial, "Used suggested weights")
+
 
         # If weights helped, add it to the history
         # if iteration is not None and iteration.r1 < initial.r1:
