@@ -1,21 +1,17 @@
 from SHELXDriver import SHELXDriver
-import os, re, copy, math, itertools, random, time
-import numpy as np
+import os, re, time
 import shutil
-from pymatgen.core.composition import Element
-import utils
 from OptimizerHistory import OptimizerHistory
 from OptimizerSteps import OptimizerSteps
 from OptimizerUtils import OptimizerUtils
-from citrination_client import CitrinationClient
 
 
 class Optimizer:
     """
     Class for performing single crystal refinement
     """
-    def __init__(self, r1_similarity_threshold=0.0075, occupancy_threshold=0.02, r1_threshold=0.1,
-                 least_squares_iterations=4, use_ml_model=False):
+    def __init__(self, r1_similarity_threshold=0.0075, occupancy_threshold=0.02, r1_threshold=0.1, score_weighting=0.8,
+                 max_n_leaves=50, least_squares_iterations=4, n_results=10):
         """
         :param r1_similarity_threshold: If r1 scores for multiple options are within this similarity threshold, the
             optimizer will branch and explore all the options.
@@ -29,15 +25,15 @@ class Optimizer:
         self.r1_threshold = r1_threshold
         self.occupancy_threshold = occupancy_threshold
         self.least_squares_iterations = least_squares_iterations
-        self.ml_model = None
-        if use_ml_model:
-            self.ml_model = CitrinationClient(os.environ["CITRINATION_API_KEY"])
-        self.utils = OptimizerUtils(self)
+        self.score_weighting = score_weighting
+        self.max_n_leaves = max_n_leaves
         self.optimizer_steps = OptimizerSteps(self)
+        self.n_results = n_results
 
 
 
-    def run(self, path_to_xl, path_to_xs, ins_path, input_prefix, output_prefix, use_wine=False, annotate_graph=False):
+    def run(self, path_to_xl, path_to_xs, ins_path, input_prefix, output_prefix, use_wine=False, annotate_graph=False,
+            bond_lengths=None, mixing_pairs=None, use_ml_model=False, write_results=False):
         """
         Method to run the optimization
         :param path_to_xl: path to xl executable
@@ -67,7 +63,8 @@ class Optimizer:
         ins_file = self.driver.get_ins_file()
         ins_file.remove_command('L.S.')
         ins_file.add_command('L.S.', [str(self.least_squares_iterations)])
-        self.history = OptimizerHistory(self.driver, ins_file)
+        self.history = OptimizerHistory(self.driver, ins_file, self.score_weighting, self.max_n_leaves)
+        self.utils = OptimizerUtils(ins_file, bond_lengths, mixing_pairs, use_ml_model)
 
         # Optimization
         self.run_step(self.optimizer_steps.identify_sites)
@@ -85,6 +82,13 @@ class Optimizer:
 
         self.driver.run_SHELXTL(self.history.get_best_history()[-1].ins_file)
         print "Done with optimization"
+        if write_results:
+            # if doesn't exist
+            os.mkdir(os.path.join(ins_path, "results"))
+            for i in range(1, self.n_results + 1):
+                with open(os.path.join(ins_path, "results", "{}.res".format(i)), 'w') as f:
+                    f.write(self.history.get_best_history()[-1*i].res_file.filetxt)
+
 
     def run_step(self, step):
         for leaf in self.history.leaves:

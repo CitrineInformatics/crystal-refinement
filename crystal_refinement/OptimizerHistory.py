@@ -7,13 +7,13 @@ class OptimizerIteration:
     """
     Define class to hold information on one optimizer iteration
     """
-    def __init__(self, parent, ins_file, res_file, bond_score, annotation=None):
+    def __init__(self, parent, ins_file, res_file, bond_score, score_weighting=1.0, annotation=None):
         self.ins_file = copy.deepcopy(ins_file)
         self.res_file = copy.deepcopy(res_file)
         self.r1 = res_file.r1
         self.bond_score = bond_score
         # the higher this is, the more the r1 counts. Must be between 0 and 1
-        self.score_weighting = 0.8
+        self.score_weighting = score_weighting
         # self.overall_score = self.r1 * self.bond_score
         self.parent = parent
         self.dead_branch = False
@@ -162,11 +162,12 @@ class OptimizerHistory:
     """
     Define class to hold information optimizer history information
     """
-    def __init__(self, driver, ins_file, max_n_leaves=50):
+    def __init__(self, driver, ins_file, score_weighting=1.0, max_n_leaves=50):
         self.driver = driver
         res = self.driver.run_SHELXTL(ins_file)
         bonds = utils.get_bonds(self.driver, res)
-        self.head = OptimizerIteration(None, ins_file, res, utils.score_compound_bonds(bonds, ins_file))
+        self.head = OptimizerIteration(None, ins_file, res, utils.score_compound_bonds(bonds, ins_file),
+                                       score_weighting=score_weighting)
         self.leaves = [self.head]
         self.max_n_leaves = max_n_leaves
 
@@ -185,7 +186,8 @@ class OptimizerHistory:
             bonds = utils.get_bonds(self.driver, res)
         except IndexError:
             return None
-        new_iter = OptimizerIteration(parent_iteration, ins_file, res, utils.score_compound_bonds(bonds, ins_file), annotation)
+        new_iter = OptimizerIteration(parent_iteration, ins_file, res, utils.score_compound_bonds(bonds, ins_file),
+                                      score_weighting=score_weightingannotation)
         return new_iter
 
     def clean_history(self):
