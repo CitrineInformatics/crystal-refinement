@@ -184,9 +184,9 @@ class SHELXFile:
     def get_analytic_formula(self):
         formula = ""
         for site in self.crystal_sites:
-            el = site.element
+            el = site.el_string.capitalize()
             stoich = self.get_site_stoichiometry(site)
-            formula += el + stoich
+            formula += "{}{}".format(el, stoich)
         return formula
 
     def change_element(self, site_index, element_index):

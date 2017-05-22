@@ -56,7 +56,7 @@ class OptimizerUtils:
         return total
 
     def get_shortest_bond(self, shelx_file):
-        return sorted([self.get_ideal_bond_length(el.capitalize(), el.capitalize()) for el in shelx_file.elements])[0]
+        return sorted([self.get_ideal_bond_length(el.capitalize(), el.capitalize(), shelx_file) for el in shelx_file.elements])[0]
 
     def get_specie(self, el, ox):
         """
@@ -156,15 +156,16 @@ class OptimizerUtils:
         TODO: This should be covalent radii instead
         :return: ideal bond length
         """
-
-        bond_key = self.get_bond_key(re.sub('\d', "", specie_name1), re.sub('\d', "", specie_name2))
+        el1 = re.sub('\d', "", specie_name1)
+        el2 = re.sub('\d', "", specie_name2)
+        bond_key = self.get_bond_key(el1, el2)
         if bond_key in self.bond_lengths:
             return self.bond_lengths[bond_key]
 
         if self.ml_model is not None:
-            candidate = {"Element 1": "Cs", "Element 2": "Cs", "formula": shelx_file.get_analytic_formula()}
             try:
-                result = self.ml_model.predict(680, candidate)["candidates"][0]["Bond length"]
+                candidate = {"Element 1": el1, "Element 2": el2, "formula": shelx_file.get_analytic_formula()}
+                result = self.ml_model.predict("680", candidate)["candidates"][0]["Bond length"]
                 if result[1] < 0.5:
                     return result[0]
 
@@ -173,9 +174,7 @@ class OptimizerUtils:
             print "Using naive bond length instead of bond length model"
 
         # Use pymatgen to get approximate bond length = sum of atomic radii
-        el1 = Element(re.sub('\d', "", specie_name1))
-        el2 = Element(re.sub('\d', "", specie_name2))
-        return el1.atomic_radius + el2.atomic_radius
+        return Element(el1).atomic_radius + Element(el2).atomic_radius
 
 
     def get_bonds(self, driver, shelx_file):
