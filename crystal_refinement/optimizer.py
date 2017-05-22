@@ -4,6 +4,7 @@ import shutil
 from OptimizerHistory import OptimizerHistory
 from OptimizerSteps import OptimizerSteps
 from OptimizerUtils import OptimizerUtils
+from collections import defaultdict
 
 
 class Optimizer:
@@ -89,6 +90,18 @@ class Optimizer:
             for i in range(1, self.n_results + 1):
                 with open(os.path.join(results_path, "{}.res".format(i)), 'w') as f:
                     f.write(self.history.get_best_history()[-1*i].res_file.filetxt)
+        bonds = self.utils.get_bonds(self.driver, self.history.get_best_history()[-1].res_file)
+        bond_by_atom = defaultdict(lambda: [])
+        for bond in bonds:
+            bond_by_atom[bond[0]].append(bond[2])
+            bond_by_atom[bond[1]].append(bond[2])
+        # Average over scores from 4 shortest bonds
+        for atom, bonds in bond_by_atom.items():
+            print atom, bonds
+
+        # print map(lambda tup: (tup[0], sorted(tup[1])[0]), bond_by_atom.items())
+
+        quit()
 
 
     def run_step(self, step):
@@ -231,18 +244,18 @@ def ins_from_result(folder_path, result_file="result.res", input_prefix="1"):
 
 def main():
     path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
-    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/4-2-1-4 INS and HKL files"
+    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/4-2-1-4 INS and HKL files"
     # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
-    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data2/EASY"
+    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data2/EASY"
     subdir = "mar1229_Rb4Zn7As7"
     graph_output_path = "/Users/eantono/Documents/src/xtal_refinement/output"
     # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
     # ins_folder = "/Users/julialing/Documents/DataScience/crystal_refinement/single_crystal_data/"
 
-    # test_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True, print_files=False,
-    #   generate_graph=True, annotate_graph=True, truncated_graph=True, graph_path=graph_output_path)
-    test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True, print_files=True,
-      generate_graph=True, annotate_graph=True, truncated_graph = True, graph_path=graph_output_path, result_filename=None)
+    test_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True, print_files=False,
+      generate_graph=True, annotate_graph=True, truncated_graph=True, graph_path=graph_output_path)
+    # test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True, print_files=True,
+    #   generate_graph=True, annotate_graph=True, truncated_graph = True, graph_path=graph_output_path, result_filename=None)
     # run_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True,
     #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
     # run_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True,

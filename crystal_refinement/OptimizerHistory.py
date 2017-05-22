@@ -143,7 +143,8 @@ class OptimizerIteration:
         new_annotation = None
         if self.annotation is not None:
             new_annotation = "Propagated from previous generation"
-        new_child = OptimizerIteration(self, self.get_ins(), self.get_res(), self.bond_score, new_annotation)
+        new_child = OptimizerIteration(self, self.get_ins(), self.get_res(), self.bond_score, self.score_weighting,
+        new_annotation)
         self.children.append(new_child)
 
     def get_score(self):
@@ -164,10 +165,12 @@ class OptimizerHistory:
     """
     def __init__(self, driver, ins_file, score_weighting=1.0, max_n_leaves=50):
         self.driver = driver
+        self.score_weighting = score_weighting
         res = self.driver.run_SHELXTL(ins_file)
         bonds = utils.get_bonds(self.driver, res)
         self.head = OptimizerIteration(None, ins_file, res, utils.score_compound_bonds(bonds, ins_file),
-                                       score_weighting=score_weighting)
+                                       score_weighting=self.score_weighting)
+
         self.leaves = [self.head]
         self.max_n_leaves = max_n_leaves
 
@@ -187,7 +190,7 @@ class OptimizerHistory:
         except IndexError:
             return None
         new_iter = OptimizerIteration(parent_iteration, ins_file, res, utils.score_compound_bonds(bonds, ins_file),
-                                      score_weighting=score_weightingannotation)
+                                      score_weighting=self.score_weighting, annotation=annotation)
         return new_iter
 
     def clean_history(self):

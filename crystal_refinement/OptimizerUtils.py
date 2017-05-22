@@ -141,7 +141,7 @@ class OptimizerUtils:
     def site_mixing_priority(self, bonds, shelx_file, n_bonds=4):
 
         # Get associated site index
-        return map(lambda tup: (int(re.search("\d+", tup[0]).group(0)), tup[1]), self.get_site_bond_scores(bonds, n_bonds, shelx_file))
+        return map(lambda tup: (int(re.search("\d+", tup[0]).group(0)), tup[1]), self.get_site_bond_scores(bonds, shelx_file, n_bonds=n_bonds))
 
     def get_bond_key(self, el1, el2):
         return ",".join(sorted([el1, el2]))
@@ -159,23 +159,27 @@ class OptimizerUtils:
         el1 = re.sub('\d', "", specie_name1)
         el2 = re.sub('\d', "", specie_name2)
         bond_key = self.get_bond_key(el1, el2)
-        if bond_key in self.bond_lengths:
-            return self.bond_lengths[bond_key]
+        # print el1, el2
+        # if bond_key in self.bond_lengths:
+        #     print "user specified", self.bond_lengths[bond_key]
 
-        if self.ml_model is not None:
-            try:
-                candidate = {"Element 1": el1, "Element 2": el2, "formula": shelx_file.get_analytic_formula()}
-                result = self.ml_model.predict("680", candidate)["candidates"][0]["Bond length"]
-                if result[1] < 0.5:
-                    return result[0]
-
-            except Exception:
-                pass
-            print "Using naive bond length instead of bond length model"
+        # if self.ml_model is not None:
+        #     candidate = {"Element 1": el1, "Element 2": el2, "formula": shelx_file.get_analytic_formula()}
+        #     # try:
+        #     result = self.ml_model.predict("680", candidate)["candidates"][0]["Bond length"]
+        #     print "model prediction:", result
+            # if result[1] < 0.5:
+            #     return result[0]
+            # except Exception:
+            # print "Using naive bond length instead of bond length model"
+            # pass
 
         # Use pymatgen to get approximate bond length = sum of atomic radii
+        # print "atomic radius: ", Element(el1).atomic_radius + Element(el2).atomic_radius
+        # print "~"*50
         return Element(el1).atomic_radius + Element(el2).atomic_radius
-
+        # quit()
+        # return 0.0
 
     def get_bonds(self, driver, shelx_file):
         """
