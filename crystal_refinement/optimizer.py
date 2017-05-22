@@ -121,10 +121,11 @@ class Optimizer:
         self.driver.run_SHELXTL(self.history.get_best_history()[-1].ins_file)
         print "Done with optimization"
         if self.n_results > 0:
-            # if doesn't exist
-            os.mkdir(os.path.join(self.path_to_ins, "results"))
+            results_path = os.path.join(ins_path, "results")
+            if not os.path.exists(results_path):
+                os.mkdir(results_path)
             for i in range(1, self.n_results + 1):
-                with open(os.path.join(self.path_to_ins, "results", "{}.res".format(i)), 'w') as f:
+                with open(os.path.join(results_path, "{}.res".format(i)), 'w') as f:
                     f.write(self.history.get_best_history()[-1*i].res_file.filetxt)
 
     def run_step(self, step):
