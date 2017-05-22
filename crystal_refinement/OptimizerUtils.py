@@ -10,23 +10,22 @@ class OptimizerUtils:
     Class for performing single crystal refinement
     """
 
-    def __init__(self, original_ins, bond_lengths=None, mixing_pairs=None, use_ml_model=False):
+    def __init__(self, shelx_file, bond_lengths=None, mixing_pairs=None, use_ml_model=False):
         if use_ml_model:
             self.ml_model = CitrinationClient(os.environ["CITRINATION_API_KEY"])
         else:
             self.ml_model = None
-        self.original_ins = original_ins
         if bond_lengths is None:
-            self.bond_lengths = {}
+            self.bond_lengths = dict()
         else:
-            self.bond_lengths = {self.get_bond_key(el1, el2) for el1, el2, bond_length in bond_lengths}
+            self.bond_lengths = {self.get_bond_key(el1, el2): bond_length for el1, el2, bond_length in bond_lengths}
         if mixing_pairs is None:
-            self.mixing_pairs = self.get_mixing_pairs(probability_threshold=2E-4)
+            self.mixing_pairs = self.get_mixing_pairs(shelx_file, probability_threshold=2E-4)
         else:
             self.mixing_pairs = mixing_pairs
 
-    def get_mixing_pairs(self, probability_threshold):
-        element_list = [Element(el.capitalize()) for el in self.original_ins.elements]
+    def get_mixing_pairs(self, shelx_file, probability_threshold):
+        element_list = [Element(el.capitalize()) for el in shelx_file.elements]
         pairs = []
 
         # For all elements in compound, calculate substitution probabilities
@@ -56,8 +55,8 @@ class OptimizerUtils:
                 total += sp.prob(self.get_specie(el1, o1), self.get_specie(el2, o2))
         return total
 
-    def get_shortest_bond(self, ins_file):
-        return sorted([self.get_ideal_bond_length(el.capitalize(), el.capitalize()) for el in ins_file.elements])[0]
+    def get_shortest_bond(self, shelx_file):
+        return sorted([self.get_ideal_bond_length(el.capitalize(), el.capitalize()) for el in shelx_file.elements])[0]
 
     def get_specie(self, el, ox):
         """
@@ -95,7 +94,7 @@ class OptimizerUtils:
 
         return -stoich_weighted_score / total_stoich
 
-    def get_bond_score(self, bond):
+    def get_bond_score(self, bond, shelx_file):
         """
         Scores the likelihood of a bond based on its deviation from an ideal bond length.
         :param bond: The bond to score
@@ -106,26 +105,22 @@ class OptimizerUtils:
         TODO: This should be covalent radii instead
         :return: bond length - ideal bond length
         """
-        ideal_bond_length = self.get_ideal_bond_length(bond[0], bond[1])
+        ideal_bond_length = self.get_ideal_bond_length(bond[0], bond[1], shelx_file)
         # Calculate amount which bonds deviate from the expected bond length
         return -abs(bond[2] - ideal_bond_length)
 
-    def get_bond_score2(self, bond):
+    def get_bond_score2(self, bond, shelx_file):
         """
         Scores the likelihood of a bond based on its deviation from an ideal bond length.
         :param bond: The bond to score
         :param ml_model: Whether to use an ml model to calculate the ideal bond length.
-        TODO: The ML model needs access to the .ins file to get the chemical system
-        TODO: Might want to refactor this to use uncertainty estimates to determine the likelihood of the given bond length
-        If not, the ideal bond length is calculated as the sum of atomic radii.
-        TODO: This should be covalent radii instead
         :return: bond length - ideal bond length
         """
-        ideal_bond_length = self.get_ideal_bond_length(bond[0], bond[1])
+        ideal_bond_length = self.get_ideal_bond_length(bond[0], bond[1], shelx_file)
         # Calculate amount which bonds deviate from the expected bond length
         return -((bond[2] - ideal_bond_length) / 2) ** 2
 
-    def get_site_bond_scores(self, bonds, n_bonds=4):
+    def get_site_bond_scores(self, bonds, shelx_file, n_bonds=4):
         """
             Determines priority for adding in site mixing.  Finds most problematic sites based on whether bonds
             are shorter than expected.
@@ -135,7 +130,7 @@ class OptimizerUtils:
             """
         bond_by_atom = defaultdict(lambda: [])
         for bond in bonds:
-            bond_score = self.get_bond_score(bond)
+            bond_score = self.get_bond_score(bond, shelx_file)
             bond_by_atom[bond[0]].append(bond_score)
             bond_by_atom[bond[1]].append(bond_score)
         # Average over scores from 4 shortest bonds
@@ -143,15 +138,15 @@ class OptimizerUtils:
         # Sort by which bonds are the shortest compared to what we'd expect
         return sorted(res, key=lambda tup: tup[1])
 
-    def site_mixing_priority(self, bonds, n_bonds=4):
+    def site_mixing_priority(self, bonds, shelx_file, n_bonds=4):
 
         # Get associated site index
-        return map(lambda tup: (int(re.search("\d+", tup[0]).group(0)), tup[1]), self.get_site_bond_scores(bonds, n_bonds))
+        return map(lambda tup: (int(re.search("\d+", tup[0]).group(0)), tup[1]), self.get_site_bond_scores(bonds, n_bonds, shelx_file))
 
     def get_bond_key(self, el1, el2):
         return ",".join(sorted([el1, el2]))
 
-    def get_ideal_bond_length(self, specie_name1, specie_name2):
+    def get_ideal_bond_length(self, specie_name1, specie_name2, shelx_file):
         """
         Scores the likelihood of a bond based on its deviation from an ideal bond length.
         :param specie_name1: One element in the bond
@@ -167,7 +162,15 @@ class OptimizerUtils:
             return self.bond_lengths[bond_key]
 
         if self.ml_model is not None:
-            pass
+            candidate = {"Element 1": "Cs", "Element 2": "Cs", "formula": shelx_file.get_analytic_formula()}
+            try:
+                result = self.ml_model.predict(680, candidate)["candidates"][0]["Bond length"]
+                if result[1] < 0.5:
+                    return result[0]
+
+            except Exception:
+                pass
+            print "Using naive bond length instead of bond length model"
 
         # Use pymatgen to get approximate bond length = sum of atomic radii
         el1 = Element(re.sub('\d', "", specie_name1))
@@ -175,14 +178,14 @@ class OptimizerUtils:
         return el1.atomic_radius + el2.atomic_radius
 
 
-    def get_bonds(self, driver, ins_file):
+    def get_bonds(self, driver, shelx_file):
         """
-        Get the bonds defined in the given ins_file
+        Get the bonds defined in the given shelx file
 
         :param ins_file: SHELXFile object
         :return res: List of bond tuples (element 1, element 2, bond length)
         """
-        ins_file = copy.deepcopy(ins_file)
+        ins_file = copy.deepcopy(shelx_file)
         ins_file.add_command("ACTA")
         ins_file.remove_command("L.S.")
         ins_file.add_command("L.S.", ["1"])
