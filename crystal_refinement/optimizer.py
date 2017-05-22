@@ -10,16 +10,57 @@ class Optimizer:
     """
     Class for performing single crystal refinement
     """
-    def __init__(self, r1_similarity_threshold=0.0075, occupancy_threshold=0.02, r1_threshold=0.1, score_weighting=0.8,
+    def __init__(self, path_to_xl, path_to_xs, path_to_ins, input_prefix, output_prefix, use_wine=False,
+                 write_graph=True, bond_lengths=None, mixing_pairs=None, use_ml_model=False,
+                 r1_similarity_threshold=0.0075, occupancy_threshold=0.02, r1_threshold=0.1, score_weighting=0.8,
                  max_n_leaves=50, least_squares_iterations=4, n_results=10):
         """
+        :param path_to_xl: path to xl executable (including executable file name)
+        :param path_to_xs: path to xs executable (including executable file name)
+        :param path_to_ins: path to directory containing *.ins file output by xprep (not including *.ins file name)
+        :param input_prefix: prefix of ins file (e.g. for file.ins, the prefix would be "file")
+        :param output_prefix: prefix of the result file that the optimizer will output
+        :param use_wine: In order to run Windows executables on a mac, the wine app can be used.
+        :param write_graph: If True, will write tree graph of optimizer paths to an image file
+        :param bond_lengths: A list of prescribed ideal bond lengths in Angstroms.  Should be in the form of triples.
+            (e.g. [(Ag, Ag, 2.85)] ).  If a bond length is not specified, then it is calculated via either a machine
+            learning model or based on the covalent radii.
+        :param mixing_pairs: A list of acceptable elements to allow to co-occupy a site.  If no such list is provided,
+            then acceptable mixing pairs are determined based on pymatgen information.
+        :param use_ml_model: Whether to use the bond length machine learning model to estimate bond lengths.
+            If True, a machine learning model hosted at citrination.com is queried to determine the bond lengths.
+                Using this option requires obtaining a free Citrination user account and setting the CITRINATION_API_KEY
+                environment variable with your account API key.
+                If this machine learning model has high uncertainty for the bond lengths queried, the optimizer defaults
+                back to the covalent radii model.
+            If False, a simpler bond length model based on covalent radii is used.
         :param r1_similarity_threshold: If r1 scores for multiple options are within this similarity threshold, the
-            optimizer will branch and explore all the options.
-        :param occupancy_threshold: Minimum deviation in occupancy or site mixing to apply those steps
+            optimizer will branch and explore all the options.  (Should be doulbe in range (0.0, 1.0)).
+        :param occupancy_threshold: Minimum deviation in occupancy or site mixing to trigger partial occupancy
+            (Should be double in range (0.0, 1.0)).
         :param r1_threshold: Threshold to denote a high r1 score, which triggers an alternate path in the optimizer
-            where bond lengths drive the optimization instead of r1
-        :param use_ml_model: Whether to use the bond length ml model to estimate bond lengths
+            where bond lengths drive the optimization instead of r1 (Should be a double in range (0.0, 1.0)).
+        :param score_weighting: Weighting of R1 score versus bond length score when choosing optimal path.
+            A value of 1.0 corresponds to R1 only.  (Should be a double in range (0.0, 1.0)).
+        :param max_n_leaves: Maximum number of optimization paths to follow at any given optimization step.
+            A higher value may give a more optimal path, but will be more computationally expensive.
+            (Should be positive integer).
+        :param least_squares_iterations: Number of least squares iterations for xl to use
+            (Should be a positive integer).
+        :param n_results: Number of final .res files to save.  For n_results=1, only the results file with the
+            best final score (based on R1 and bond lengths) will be saved.  (Should be a non-negative integer).
+
         """
+        self.path_to_xl = path_to_xl
+        self.path_to_xs = path_to_xs
+        self.path_to_ins = path_to_ins
+        self.input_prefix = input_prefix
+        self.output_prefix = output_prefix
+        self.use_wine = use_wine
+        self.write_graph = write_graph
+        self.bond_lengths = bond_lengths
+        self.mixing_pairs = mixing_pairs
+        self.use_ml_model = use_ml_model
         self.overall_score_similarity_threshold = 0.05
         self.r1_similarity_threshold = r1_similarity_threshold
         self.r1_threshold = r1_threshold
@@ -30,41 +71,36 @@ class Optimizer:
         self.optimizer_steps = OptimizerSteps(self)
         self.n_results = n_results
 
+        self.driver = None
+        self.history = None
+        self.utils = None
 
-
-    def run(self, path_to_xl, path_to_xs, ins_path, input_prefix, output_prefix, use_wine=False, annotate_graph=False,
-            bond_lengths=None, mixing_pairs=None, use_ml_model=False, write_results=False):
+    def run(self):
         """
         Method to run the optimization
-        :param path_to_xl: path to xl executable
-        :param path_to_xs: path to xs executable
-        :param ins_path: path to ins file output by xprep
-        :param input_prefix: prefix of ins file (eg for file.ins, the prefix would be "file")
-        :param output_prefix: prefix of the result file that the optimizer will output
+
         :return:
         """
 
         # Copy ins and hkl file to output prefix
-        os.chdir(ins_path)
-        shutil.copy(os.path.join(ins_path, input_prefix + ".hkl"), os.path.join(ins_path, output_prefix + ".hkl"))
-        shutil.copy(os.path.join(ins_path, input_prefix + ".ins"), os.path.join(ins_path, output_prefix + ".ins"))
-        self.annotate_graph = annotate_graph
-        self.driver = SHELXDriver(ins_path=ins_path, prefix=output_prefix, path_to_xl=path_to_xl, path_to_xs=path_to_xs, use_wine=use_wine)
+        os.chdir(self.path_to_ins)
+        shutil.copy(os.path.join(self.path_to_ins, self.input_prefix + ".hkl"), os.path.join(self.path_to_ins, self.output_prefix + ".hkl"))
+        shutil.copy(os.path.join(self.path_to_ins, self.input_prefix + ".ins"), os.path.join(self.path_to_ins, self.output_prefix + ".ins"))
+        self.driver = SHELXDriver(ins_path=self.path_to_ins, prefix=self.output_prefix, path_to_xl=self.path_to_xl, path_to_xs=self.path_to_xs, use_wine=self.use_wine)
 
         # Check that the ins file is direct from xprep, without having been run before
-        f = open(output_prefix + ".ins")
-        # assert len(f.readlines()) < 15, "Error: Must run optimizer directly on output from xprep, without other changes"
+        f = open(self.output_prefix + ".ins")
 
         # Run first iteration using xs
         self.driver.run_SHELXTL_command(cmd="xs")
-        shutil.copy(os.path.join(ins_path, output_prefix + ".res"), os.path.join(ins_path, output_prefix + ".ins"))
+        shutil.copy(os.path.join(self.path_to_ins, self.output_prefix + ".res"), os.path.join(self.path_to_ins, self.output_prefix + ".ins"))
 
         # Read in and run initial SHELXTL file
         ins_file = self.driver.get_ins_file()
         ins_file.remove_command('L.S.')
         ins_file.add_command('L.S.', [str(self.least_squares_iterations)])
         self.history = OptimizerHistory(self.driver, ins_file, self.score_weighting, self.max_n_leaves)
-        self.utils = OptimizerUtils(ins_file, bond_lengths, mixing_pairs, use_ml_model)
+        self.utils = OptimizerUtils(ins_file, self.bond_lengths, self.mixing_pairs, self.use_ml_model)
 
         # Optimization
         self.run_step(self.optimizer_steps.identify_sites)
@@ -82,13 +118,12 @@ class Optimizer:
 
         self.driver.run_SHELXTL(self.history.get_best_history()[-1].ins_file)
         print "Done with optimization"
-        if write_results:
+        if self.n_results > 0:
             # if doesn't exist
-            os.mkdir(os.path.join(ins_path, "results"))
+            os.mkdir(os.path.join(self.path_to_ins, "results"))
             for i in range(1, self.n_results + 1):
-                with open(os.path.join(ins_path, "results", "{}.res".format(i)), 'w') as f:
+                with open(os.path.join(self.path_to_ins, "results", "{}.res".format(i)), 'w') as f:
                     f.write(self.history.get_best_history()[-1*i].res_file.filetxt)
-
 
     def run_step(self, step):
         for leaf in self.history.leaves:
