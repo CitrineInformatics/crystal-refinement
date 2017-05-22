@@ -14,11 +14,11 @@ class SHELXDriver:
         :param use_wine: Set this flag to true if running windows executables using wine on a mac.
         """
         self.use_wine = use_wine
-        self.path_to_xl = path_to_xl  # Path to the directory where xl executable is
+        self.path_to_xl = path_to_xl
         self.path_to_xs = path_to_xs
-        self.directory = ins_path  # Path to initial ins file
+        self.directory = ins_path
         self.file_prefix = prefix
-        self.hkl_file = os.path.join(self.directory, prefix + ".hkl")  # These are the inputs
+        self.hkl_file = os.path.join(self.directory, prefix + ".hkl")
         self.ins_file = os.path.join(self.directory, prefix + ".ins")
         self.res_file = os.path.join(self.directory, prefix + ".res")
         self.cif_file = os.path.join(self.directory, prefix + ".cif")
