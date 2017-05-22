@@ -1,4 +1,4 @@
-import copy, random, utils
+import copy, random, utils, math
 from graphviz import Digraph
 import numpy as np
 
@@ -12,7 +12,9 @@ class OptimizerIteration:
         self.res_file = copy.deepcopy(res_file)
         self.r1 = res_file.r1
         self.bond_score = bond_score
-        self.overall_score = self.r1 * self.bond_score
+        # the higher this is, the more the r1 counts. Must be between 0 and 1
+        self.score_weighting = 0.8
+        # self.overall_score = self.r1 * self.bond_score
         self.parent = parent
         self.dead_branch = False
         self.children = []
@@ -52,17 +54,17 @@ class OptimizerIteration:
 
     def generate_graph(self, output_file):
         dot = Digraph()
-        node_label = str(random.getrandbits(16))
+        node_label = str(random.getrandbits(32))
         dot.node(node_label, str(self.r1), color="green")
         best = self.get_best()
         for i, child in enumerate(self.children):
-            child._generate_graph(str(random.getrandbits(16)), node_label, dot, best)
+            child._generate_graph(str(random.getrandbits(32)), node_label, dot, best)
         dot.render(output_file, view=False)
 
     def _generate_graph(self, node_label, parent_label, dot, best):
         highlight = False
         for i, child in enumerate(self.children):
-            if child._generate_graph(str(random.getrandbits(16)), node_label, dot, best):
+            if child._generate_graph(str(random.getrandbits(32)), node_label, dot, best):
                 highlight = True
         if len(self.children) == 0:
             if self == best:
@@ -73,11 +75,68 @@ class OptimizerIteration:
         if self.dead_branch:
             color = "red"
 
-        dot.node(node_label, str(self.r1), color=color)
+        dot.node(node_label, "r1: {}\nbond: {}\noverall:{}".format(self.r1, self.bond_score, self.get_score()), color=color)
         dot.edge(parent_label, node_label, color=color, label=self.annotation)
 
         return highlight
 
+
+    def generate_truncated_graph(self, output_file):
+        dot = Digraph()
+        node_label = str(random.getrandbits(32))
+        dot.node(node_label, "r1: {}\nbond: {}\noverall:{}".format(self.r1, self.bond_score, self.get_score()), color="green")
+        best = self.get_best()
+        self._generate_truncated_graph(node_label, dot, best)
+        dot.render(output_file, view=False)
+
+    def _generate_truncated_graph(self, node_label, dot, best):
+        # The parent node (this) controls the rendering of it's child nodes
+        # if all children are dead branches, don't render any children
+        highlight = False
+        for child in self.children:
+            child_label = str(random.getrandbits(32))
+            color = "black"
+            if child.is_dead_branch():
+                color = "red"
+            else:
+                if child._generate_truncated_graph(child_label, dot, best):
+                    color = "green"
+                    highlight = True
+            dot.node(child_label, "r1: {}\nbond: {}\noverall:{}".format(child.r1, child.bond_score, child.get_score()),
+                     color=color)
+            dot.edge(node_label, child_label, color=color, label=child.annotation)
+
+        if len(self.children) == 0:
+            if self == best:
+                highlight = True
+
+        return highlight
+
+    def is_dead_branch(self):
+        if self.dead_branch:
+            return True
+        else:
+            if len(self.children) == 0:
+                return False
+            for child in self.children:
+                if not child.is_dead_branch():
+                    return False
+        return True
+
+    def update_dead_branches(self):
+
+        if self.is_dead_branch():
+            self.dead_branch = True
+        else:
+            if len(self.children) == 0:
+                self.dead_branch = False
+            else:
+                dead_branch = True
+                for child in self.children:
+                    child.update_dead_branches()
+                    if not child.is_dead_branch():
+                        dead_branch = False
+                self.dead_branch = dead_branch
 
     # Copy this iteration into the next generation
     def propagate(self):
@@ -87,8 +146,13 @@ class OptimizerIteration:
         new_child = OptimizerIteration(self, self.get_ins(), self.get_res(), self.bond_score, new_annotation)
         self.children.append(new_child)
 
+    def get_score(self):
+        return math.pow(self.r1, self.score_weighting) * math.pow(self.bond_score, 1 - self.score_weighting)
+        # return self.r1 * self.bond_score
+        # return (self.r1, len(self.res_file.mixed_site_numbers))
+
     def get_sorted_leaves(self):
-        return sorted(self.get_leaves(), key=lambda iteration: (iteration.r1, len(iteration.res_file.mixed_site_numbers)))
+        return sorted(self.get_leaves(), key=lambda iteration: iteration.get_score())
 
     def get_best(self):
         return self.get_sorted_leaves()[0]
@@ -98,7 +162,7 @@ class OptimizerHistory:
     """
     Define class to hold information optimizer history information
     """
-    def __init__(self, driver, ins_file, max_n_leaves=10):
+    def __init__(self, driver, ins_file, max_n_leaves=50):
         self.driver = driver
         res = self.driver.run_SHELXTL(ins_file)
         bonds = utils.get_bonds(self.driver, res)
