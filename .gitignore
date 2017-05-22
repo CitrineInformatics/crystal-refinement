@@ -2,5 +2,4 @@
 crystal_refinement/workbench.py
 *.pyc
 output/
-crystal_refinement/OptimizerSteps.py
 .DS_store
