@@ -51,6 +51,8 @@ class Optimizer:
             best final score (based on R1 and bond lengths) will be saved.  (Should be a non-negative integer).
 
         """
+
+        # Initialize parameters based on arguments
         self.path_to_xl = path_to_xl
         self.path_to_xs = path_to_xs
         self.path_to_ins = path_to_ins
@@ -71,7 +73,8 @@ class Optimizer:
         self.optimizer_steps = OptimizerSteps(self)
         self.n_results = n_results
 
-        self.driver = None
+        # Initialize objects to be used during run()
+        self.driver = SHELXDriver(ins_path=self.path_to_ins, prefix=self.output_prefix, path_to_xl=self.path_to_xl, path_to_xs=self.path_to_xs, use_wine=self.use_wine)
         self.history = None
         self.utils = None
 
@@ -86,7 +89,6 @@ class Optimizer:
         os.chdir(self.path_to_ins)
         shutil.copy(os.path.join(self.path_to_ins, self.input_prefix + ".hkl"), os.path.join(self.path_to_ins, self.output_prefix + ".hkl"))
         shutil.copy(os.path.join(self.path_to_ins, self.input_prefix + ".ins"), os.path.join(self.path_to_ins, self.output_prefix + ".ins"))
-        self.driver = SHELXDriver(ins_path=self.path_to_ins, prefix=self.output_prefix, path_to_xl=self.path_to_xl, path_to_xs=self.path_to_xs, use_wine=self.use_wine)
 
         # Check that the ins file is direct from xprep, without having been run before
         f = open(self.output_prefix + ".ins")
@@ -133,17 +135,17 @@ class Optimizer:
 
 
 def test_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp", use_wine=False, print_files=False,
-             generate_graph=False, annotate_graph=False, truncated_graph=False, graph_path=""):
+             generate_graph=False, truncated_graph=False, graph_path=""):
     subdirs = os.listdir(ins_folder)
     for dirname in subdirs:
         if dirname[0] != "." and "mar" in dirname:
             print dirname
             test_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix, use_wine,
-                        print_files, generate_graph, annotate_graph, truncated_graph, graph_path)
+                        print_files, generate_graph, truncated_graph, graph_path)
 
 
 def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix="temp", use_wine=False, print_files=False,
-                generate_graph=False, annotate_graph=False, truncated_graph=False, graph_path="", result_filename=None):
+                generate_graph=False, truncated_graph=False, graph_path="", result_filename=None):
     if "INS-HKL" in os.listdir(dirname):
         final_res = ""
         ins_path = os.path.join(dirname, "INS-HKL")
@@ -185,7 +187,7 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
 
     start = time.time()
     opt = run_single(path_to_SXTL_dir, ins_path, input_prefix, output_prefix, use_wine,
-                     generate_graph, annotate_graph, truncated_graph, graph_path, graph_name)
+                     generate_graph, truncated_graph, graph_path, graph_name)
     runtime = time.time() - start
     # except Exception, e:
     #     print "Optimizer failure:", e
@@ -212,10 +214,10 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
 
 
 def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix="temp", use_wine=False,
-               generate_graph=False, annotate_graph=False, truncated_graph=False, graph_path="", graph_name="out"):
-    opt = Optimizer()
-    opt.run(os.path.join(path_to_SXTL_dir, "xl.exe"), os.path.join(path_to_SXTL_dir, "xs.exe"), ins_path, input_prefix, output_prefix, use_wine=use_wine,
-            annotate_graph=annotate_graph)
+               generate_graph=False, truncated_graph=False, graph_path="", graph_name="out"):
+    opt = Optimizer(os.path.join(path_to_SXTL_dir, "xl.exe"), os.path.join(path_to_SXTL_dir, "xs.exe"), ins_path, input_prefix,
+            output_prefix, use_wine=use_wine)
+    opt.run()
     if generate_graph:
         if truncated_graph:
             opt.history.head.update_dead_branches()
@@ -226,13 +228,13 @@ def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix
 
 
 def run_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp", use_wine=False,
-            generate_graph=False, annotate_graph=False, truncated_graph=False, graph_path=""):
+            generate_graph=False, truncated_graph=False, graph_path=""):
     subdirs = os.listdir(ins_folder)
     print subdirs
     for dirname in subdirs:
         if dirname[0] != ".":
             opt = run_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix, use_wine,
-                             generate_graph, annotate_graph, truncated_graph, graph_path)
+                             generate_graph, truncated_graph, graph_path)
             best_history = opt.history.get_best_history()
             print len(opt.history.leaves), "path(s) tried"
             print "Initial r1: {}".format(best_history[0].r1)
@@ -274,13 +276,13 @@ def main():
     # ins_folder = "/Users/julialing/Documents/DataScience/crystal_refinement/single_crystal_data/"
 
     # test_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True, print_files=False,
-    #   generate_graph=True, annotate_graph=True, truncated_graph=True, graph_path=graph_output_path)
+    #   generate_graph=True, truncated_graph=True, graph_path=graph_output_path)
     test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True, print_files=True,
-      generate_graph=True, annotate_graph=True, truncated_graph = True, graph_path=graph_output_path, result_filename=None)
+      generate_graph=True, truncated_graph = True, graph_path=graph_output_path, result_filename=None)
     # run_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True,
-    #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
+    #   generate_graph=True, graph_path=graph_output_path)
     # run_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True,
-    #   generate_graph=True, annotate_graph=True, graph_path=graph_output_path)
+    #   generate_graph=True, graph_path=graph_output_path)
 
 if __name__ == "__main__":
     main()
