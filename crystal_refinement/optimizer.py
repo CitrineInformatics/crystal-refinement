@@ -4,6 +4,7 @@ import shutil
 from OptimizerHistory import OptimizerHistory
 from OptimizerSteps import OptimizerSteps
 from OptimizerUtils import OptimizerUtils
+from collections import defaultdict
 
 
 class Optimizer:
@@ -120,13 +121,36 @@ class Optimizer:
 
         self.driver.run_SHELXTL(self.history.get_best_history()[-1].ins_file)
         print "Done with optimization"
-        if self.n_results > 0:
-            results_path = os.path.join(self.path_to_ins, "results")
-            if not os.path.exists(results_path):
-                os.mkdir(results_path)
-            for i in range(1, self.n_results + 1):
-                with open(os.path.join(results_path, "{}.res".format(i)), 'w') as f:
-                    f.write(self.history.get_best_history()[-1*i].res_file.filetxt)
+        results_path = os.path.join(self.path_to_ins, "optimizer_results")
+        if not os.path.exists(results_path):
+            os.mkdir(results_path)
+        with open(os.path.join(results_path, "report.txt"), 'w') as f:
+            if self.history.head.r1 > 0.1:
+                f.write("High initial R1 score, there may be something wrong with the site assigments (which are actually sites)\n")
+            if self.history.get_best_history()[-1].r1 > 0.1:
+                f.write("High final R1 score, the optimization may not have been successful\n")
+            f.write(self.utils.get_report())
+        for i in range(1, min(self.n_results, len(self.history.leaves)) + 1):
+            with open(os.path.join(results_path, "{}.res".format(i)), 'w') as f:
+                f.write(self.history.get_best_history()[-1*i].res_file.filetxt)
+        # bonds = self.utils.get_bonds(self.driver, self.history.get_best_history()[-1].res_file)
+        # bond_by_atom = defaultdict(lambda: [])
+        # for bond in bonds:
+        #     bond_by_atom[bond[0]].append((bond[1], bond[2]))
+        #     bond_by_atom[bond[1]].append((bond[0], bond[2]))
+        # from citrination_client import CitrinationClient
+        # from pymatgen.core import Element
+        # for atom, bonds in bond_by_atom.items():
+        #     shortest = sorted(bonds, key=lambda tup: tup[1])[0]
+        #     print atom, shortest
+        #     candidate = {"Element 1": re.sub("\d", "", atom), "Element 2": re.sub("\d", "", shortest[0]), "formula": self.history.get_best_history()[-1].res_file.get_analytic_formula()}
+        #     result = CitrinationClient(os.environ["CITRINATION_API_KEY"]).predict("680", candidate)["candidates"][0]["Bond length"]
+        #     print "ml model:", shortest[1] - result[0], result
+        #     print "sum of radii:", shortest[1] - (Element(re.sub("\d", "", atom)).atomic_radius + Element(re.sub("\d", "", shortest[0])).atomic_radius), Element(re.sub("\d", "", atom)).atomic_radius + Element(re.sub("\d", "", shortest[0])).atomic_radius
+        #     print "#"*50
+
+        # print map(lambda tup: (tup[0], sorted(tup[1])[0]), bond_by_atom.items())
+
 
     def run_step(self, step):
         """

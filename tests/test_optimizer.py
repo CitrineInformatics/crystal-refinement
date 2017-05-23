@@ -2,11 +2,12 @@ import os, re, time
 import shutil
 from crystal_refinement.optimizer import Optimizer
 
+
 def test_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp", use_wine=False, print_files=False,
              generate_graph=False, truncated_graph=False, graph_path=""):
     subdirs = os.listdir(ins_folder)
     for dirname in subdirs:
-        if dirname[0] != "." and "mar" in dirname:
+        if dirname[0] != ".":
             print dirname
             test_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix, use_wine,
                         print_files, generate_graph, truncated_graph, graph_path)
@@ -84,7 +85,7 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
 def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix="temp", use_wine=False,
                generate_graph=False, truncated_graph=False, graph_path="", graph_name="out"):
     opt = Optimizer(os.path.join(path_to_SXTL_dir, "xl.exe"), os.path.join(path_to_SXTL_dir, "xs.exe"), ins_path, input_prefix,
-            output_prefix, use_wine=use_wine)
+            output_prefix, use_wine=use_wine, n_results=0, use_ml_model=True)
     opt.run()
     if generate_graph:
         if truncated_graph:
@@ -134,20 +135,29 @@ def ins_from_result(folder_path, result_file="result.res", input_prefix="1"):
 
 
 def main():
-    # path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
+    path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
     # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/4-2-1-4 INS and HKL files"
     # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
-    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data2/EASY"
-    # subdir = "mar1229_Rb4Zn7As7"
-    # graph_output_path = "/Users/eantono/Documents/src/xtal_refinement/output"
-    path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
-    ins_folder = "/Users/julialing/Documents/DataScience/crystal_refinement/single_crystal_data/"
-    graph_output_path = '/Users/julialing/Documents/DataScience/crystal_refinement/single_crystal_data/'
-    subdir = 'Ce4Co2InGe4/'
-    # test_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True, print_files=False,
-    #   generate_graph=True, truncated_graph=True, graph_path=graph_output_path)
-    test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "absfac1", use_wine=True, print_files=True,
-      generate_graph=True, truncated_graph = True, graph_path=graph_output_path, result_filename=None)
+    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data1/EASY"
+    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data1/MIXING"
+    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data2/EASY"
+    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data2/Partial occupancy"
+    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data2/mixing"
+    subdir = "Ce4Mn2InGe4_mar1247"
+    graph_output_path = "/Users/eantono/Documents/src/xtal_refinement/output"
+    # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
+    # ins_folder = "/Users/julialing/Documents/DataScience/crystal_refinement/single_crystal_data/"
+    # from shutil import copyfile
+    # for subdir in os.listdir(ins_folder):
+    #     if subdir[0] != ".":
+    #         folder = os.path.join(ins_folder, subdir, "INS-HKL")
+    #         copyfile(os.path.join(folder, "1.hkl"), os.path.join(folder, "result.hkl"))
+    # quit()
+    test_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True, print_files=False,
+      generate_graph=True, truncated_graph=True, graph_path=graph_output_path)
+    # test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True, print_files=True,
+    #   generate_graph=True, truncated_graph = True, graph_path=graph_output_path, result_filename=None)
+
     # run_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True,
     #   generate_graph=True, graph_path=graph_output_path)
     # run_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "1", use_wine=True,
