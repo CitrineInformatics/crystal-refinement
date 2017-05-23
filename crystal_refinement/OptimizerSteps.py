@@ -48,6 +48,7 @@ class OptimizerSteps:
             if len(to_delete) == 0:
                 break
             ins_file.remove_sites_by_number(to_delete)
+            ins_file.renumber_sites()
             prev_iteration = self.optimizer.history.run_and_save(ins_file, prev_iteration)
             # quit()
 
@@ -78,7 +79,7 @@ class OptimizerSteps:
                 self.optimizer.history.save([iterations[0]])
                 for leaf in initial.get_leaves():
                     #   If adding one peak helped, recursively try adding another peak until it stops helping
-                    self.optimizer.try_add_q(leaf)
+                    self.try_add_q(leaf)
 
 
     def try_remove_site(self, initial):
@@ -134,7 +135,6 @@ class OptimizerSteps:
                 iterations = []
                 for elem in range(1, num_elems + 1):
                     ins_file.change_element(i, elem)
-
                     prev = prev_iter.res_file.crystal_sites[i].get_name()
                     cur = ins_file.crystal_sites[i].get_name()
                     iteration = self.optimizer.history.run_iter(ins_file, prev_iter, "Changed {} to {}".format(prev, cur))

@@ -1,6 +1,7 @@
 import re, copy
 from CrystalSite import CrystalSite
 import numpy as np
+from pymatgen import Composition
 #TODO JL: REPLACE ALL main() with examples that will run locally
 
 
@@ -187,7 +188,7 @@ class SHELXFile:
             el = site.el_string.capitalize()
             stoich = self.get_site_stoichiometry(site)
             formula += "{}{}".format(el, stoich)
-        return formula
+        return Composition(formula).alphabetical_formula
 
     def change_element(self, site_index, element_index):
         """

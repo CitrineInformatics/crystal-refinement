@@ -1,5 +1,5 @@
 from pymatgen.structure_prediction.substitution_probability import SubstitutionProbability
-from pymatgen.core.composition import Element
+from pymatgen import Element
 import re, copy, itertools, os
 from collections import defaultdict
 from pymatgen.io.cif import CifParser
@@ -13,6 +13,7 @@ class OptimizerUtils:
     def __init__(self, shelx_file, bond_lengths=None, mixing_pairs=None, use_ml_model=False):
         if use_ml_model:
             self.ml_model = CitrinationClient(os.environ["CITRINATION_API_KEY"])
+            self.prediction_cache = {}
         else:
             self.ml_model = None
         if bond_lengths is None:
@@ -23,6 +24,36 @@ class OptimizerUtils:
             self.mixing_pairs = self.get_mixing_pairs(shelx_file, probability_threshold=2E-4)
         else:
             self.mixing_pairs = mixing_pairs
+
+    def get_ml_prediction(self, el1, el2, shelx_file):
+        formula = shelx_file.get_analytic_formula()
+        prediction_key = (el1, el2, formula)
+        if prediction_key in self.prediction_cache:
+            return self.prediction_cache[prediction_key][0]
+        try:
+            candidate = {"Element 1": el1, "Element 2": el2, "formula": formula}
+            result = self.ml_model.predict("680", candidate)["candidates"][0]["Bond length"]
+            if result[1] < 0.5:
+                self.prediction_cache[prediction_key] = result
+                return self.prediction_cache[prediction_key][0]
+        except Exception:
+            pass
+        # print "Using naive bond length instead of bond length model for {}-{} bond in {}".format(el1, el2, formula)
+        self.prediction_cache[prediction_key] = [Element(el1).atomic_radius + Element(el2).atomic_radius, 0.0]
+        return self.prediction_cache[prediction_key][0]
+
+    def get_report(self):
+        report = ""
+        report += "Mixing pairs considered: {}\n\n".format(", ".join(self.mixing_pairs))
+        report += "Bond lengths used:\n"
+        for k, v in sorted(self.prediction_cache.items()):
+            report += "Bond: {}-{}, length: {}, formula: {}".format(k[0], k[1], k[2], v[0])
+            if v[1] == 0.0:
+                report += " Used naive bond length instead of model due to high uncertainty\n"
+            else:
+                report += "\n"
+        report += "\n"
+        return report
 
     def get_mixing_pairs(self, shelx_file, probability_threshold):
         element_list = [Element(el.capitalize()) for el in shelx_file.elements]
@@ -159,27 +190,14 @@ class OptimizerUtils:
         el1 = re.sub('\d', "", specie_name1)
         el2 = re.sub('\d', "", specie_name2)
         bond_key = self.get_bond_key(el1, el2)
-        # print el1, el2
-        # if bond_key in self.bond_lengths:
-        #     print "user specified", self.bond_lengths[bond_key]
+        if bond_key in self.bond_lengths:
+            return self.bond_lengths[bond_key]
 
-        # if self.ml_model is not None:
-        #     candidate = {"Element 1": el1, "Element 2": el2, "formula": shelx_file.get_analytic_formula()}
-        #     # try:
-        #     result = self.ml_model.predict("680", candidate)["candidates"][0]["Bond length"]
-        #     print "model prediction:", result
-            # if result[1] < 0.5:
-            #     return result[0]
-            # except Exception:
-            # print "Using naive bond length instead of bond length model"
-            # pass
+        if self.ml_model is not None:
+            return self.get_ml_prediction(el1, el2, shelx_file)
 
         # Use pymatgen to get approximate bond length = sum of atomic radii
-        # print "atomic radius: ", Element(el1).atomic_radius + Element(el2).atomic_radius
-        # print "~"*50
         return Element(el1).atomic_radius + Element(el2).atomic_radius
-        # quit()
-        # return 0.0
 
     def get_bonds(self, driver, shelx_file):
         """
