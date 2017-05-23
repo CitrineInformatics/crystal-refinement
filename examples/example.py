@@ -31,10 +31,10 @@ input_prefix = options.input_prefix
 output_prefix = options.output_prefix
 
 # Create optimizer object and run on example
-opt = Optimizer()
-opt.run(path_to_xl=xl_path, path_to_xs=xs_path, ins_path=ins_path, input_prefix=input_prefix,
+opt = Optimizer(path_to_xl=xl_path, path_to_xs=xs_path, path_to_ins=ins_path, input_prefix=input_prefix,
         output_prefix=output_prefix, use_wine=use_wine)
+opt.run()
 
-print "Final R1 value:", opt.r1_history[-1]
+
 
 
