@@ -54,4 +54,23 @@ This will generate an output file output.res containing the finalized crystal st
 
 --path-to-ins should not include the file name of the ins file.  It should just include the path to the directory.
 
+# How it works
+
+The optimizer tries the following steps in order:
+1) Identify crystal sites (try adding or removing Q peaks)
+2) Switch elements at each crystal site
+3) Try site mixing at each site
+4) Try partial occupancy at each site
+5) Try extinguishing
+6) Try anisotropy 
+
+At each step, the optimization takes into account both the fit R1 value as well as the bond lengths.
+The idea bond lengths can be determined by 3 different methods:
+1) User input via the bond_length argument to the Optimizer class
+2) A machine learning model for bond length hosted at citrination.com.  To use this model, the user must have a free account on the public Citrination site.
+3) Covalent radii of the elements
+
+The optimizer will follow multiple paths to see which path yields the best final fit.  For example, if two different elements both yield similar R1 values at a given crystal site, the optimizer will try both options to see which give the best final fit.  This results in a branching tree structure.
+The optimizer tree graph can be visualized using the generate_plot() method.
+
 
