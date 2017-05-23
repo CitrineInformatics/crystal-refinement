@@ -221,3 +221,6 @@ class OptimizerHistory:
 
     def get_best_history(self):
         return self.head.get_best().get_full_history()
+
+    def generate_graph(self, output_file):
+        self.head.generate_graph(output_file)
