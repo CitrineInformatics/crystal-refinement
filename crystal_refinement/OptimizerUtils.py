@@ -11,6 +11,7 @@ class OptimizerUtils:
     """
 
     def __init__(self, shelx_file, bond_lengths=None, mixing_pairs=None, use_ml_model=False):
+        self.element_list = [Element(el.capitalize()) for el in shelx_file.elements]
         if use_ml_model:
             self.ml_model = CitrinationClient(os.environ["CITRINATION_API_KEY"])
             self.prediction_cache = {}
@@ -39,19 +40,31 @@ class OptimizerUtils:
         except Exception:
             pass
         # print "Using naive bond length instead of bond length model for {}-{} bond in {}".format(el1, el2, formula)
-        self.prediction_cache[prediction_key] = [Element(el1).atomic_radius + Element(el2).atomic_radius, 0.0]
+        self.prediction_cache[prediction_key] = [float(Element(el1).atomic_radius + Element(el2).atomic_radius), 0.0]
         return self.prediction_cache[prediction_key][0]
 
     def get_report(self):
         report = ""
         report += "Mixing pairs considered: {}\n\n".format(", ".join(self.mixing_pairs))
-        report += "Bond lengths used:\n"
-        for k, v in sorted(self.prediction_cache.items()):
-            report += "Bond: {}-{}, length: {}, formula: {}".format(k[0], k[1], k[2], v[0])
-            if v[1] == 0.0:
-                report += " Used naive bond length instead of model due to high uncertainty\n"
-            else:
-                report += "\n"
+        for elements, bond_length in self.bond_lengths.items():
+            report += "User defined bond lengths:\n"
+            report += "Bond: {}-{}, length: {:.3f} ang\n".format(elements[0], elements[1], bond_length)
+        if self.ml_model is None:
+            report += "Naive bond lengths:\n"
+            for i in range(len(self.element_list)):
+                for j in range(i, len(self.element_list)):
+                    el1 = self.element_list[i]
+                    el2 = self.element_list[j]
+                report += "Bond: {}-{}, length: {:.3f} ang".format(el1, el2, Element(el1).atomic_radius + Element(el2).atomic_radius)
+
+        else:
+            report += "ML model bond lengths:\n"
+            for k, v in sorted(self.prediction_cache.items()):
+                report += "Bond: {}-{}, length: {:.3f} ang, formula: {}".format(k[0], k[1], v[0], k[2])
+                if v[1] == 0.0:
+                    report += ", Used naive bond length instead of model due to high uncertainty\n"
+                else:
+                    report += "\n"
         report += "\n"
         return report
 
