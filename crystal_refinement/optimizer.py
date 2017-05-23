@@ -108,9 +108,6 @@ class Optimizer:
         # Optimization
         self.run_step(self.optimizer_steps.identify_sites)
         self.run_step(self.optimizer_steps.switch_elements)
-        # self.run_step(self.switch_elements)
-        # There is currently an inherent assumption that switch elements will never be called after site mixing, since
-        # after site mixing, the indices don't line up anymore
         self.run_step(self.optimizer_steps.try_site_mixing)
 
         self.run_step(self.optimizer_steps.change_occupancy)
@@ -161,5 +158,7 @@ class Optimizer:
         for leaf in self.history.leaves:
             step(leaf)
 
+    def generate_graph(self, output_file):
+        self.history.generate_graph(output_file)
 
 
