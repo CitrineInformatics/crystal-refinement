@@ -11,7 +11,7 @@ class OptimizerUtils:
     """
 
     def __init__(self, shelx_file, bond_lengths=None, mixing_pairs=None, use_ml_model=False):
-        self.element_list = [Element(el.capitalize()) for el in shelx_file.elements]
+        self.element_list = [str(Element(el.capitalize())) for el in shelx_file.elements]
         if use_ml_model:
             self.ml_model = CitrinationClient(os.environ["CITRINATION_API_KEY"])
             self.prediction_cache = {}
@@ -24,7 +24,12 @@ class OptimizerUtils:
         if mixing_pairs is None:
             self.mixing_pairs = self.get_mixing_pairs(shelx_file, probability_threshold=2E-4)
         else:
-            self.mixing_pairs = mixing_pairs
+            self.mixing_pairs = []
+            for el1, el2 in mixing_pairs:
+                assert el1 in self.element_list and el2 in self.element_list, "User defined mixing elements {} and {} " \
+                    "must be elements specified in the ins file".format(el1, el2)
+                self.mixing_pairs.append([self.element_list.index(el1), self.element_list.index(el2)])
+
 
     def get_ml_prediction(self, el1, el2, shelx_file):
         formula = shelx_file.get_analytic_formula()
@@ -45,7 +50,7 @@ class OptimizerUtils:
 
     def get_report(self):
         report = ""
-        report += "Mixing pairs considered: {}\n\n".format(", ".join(self.mixing_pairs))
+        report += "Mixing pairs considered: {}\n\n".format(", ".join(["({}, {})".format(self.element_list[i1], self.element_list[i2]) for i1, i2 in self.mixing_pairs]))
         for elements, bond_length in self.bond_lengths.items():
             report += "User defined bond lengths:\n"
             report += "Bond: {}-{}, length: {:.3f} ang\n".format(elements[0], elements[1], bond_length)
@@ -122,7 +127,7 @@ class OptimizerUtils:
         :param ml_model:
         :return:
         """
-        site_bond_scores = self.get_site_bond_scores(bonds, 1)
+        site_bond_scores = self.get_site_bond_scores(bonds, shelx_file, n_bonds=1)
         total_stoich = 0
         stoich_weighted_score = 0
         for site_name, score in site_bond_scores:
