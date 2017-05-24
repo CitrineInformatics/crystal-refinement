@@ -1,11 +1,13 @@
 import os, re, time
 import shutil
-from crystal_refinement.optimizer import Optimizer
+from crystal_refinement.Optimizer import Optimizer
 
 
 def test_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp", use_wine=False, print_files=False,
              generate_graph=False, truncated_graph=False, graph_path=""):
     subdirs = os.listdir(ins_folder)
+    subdirs = ['mar1532_BaZnSiSe4', 'Tb4RhInGe4 structure', 'Y3Ru2Ge3_lt', 'Y3Ru2Ge3_rt_2']
+
     for dirname in subdirs:
         if dirname[0] != ".":
             print dirname
@@ -99,7 +101,6 @@ def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix
 def run_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp", use_wine=False,
             generate_graph=False, truncated_graph=False, graph_path=""):
     subdirs = os.listdir(ins_folder)
-    print subdirs
     for dirname in subdirs:
         if dirname[0] != ".":
             opt = run_single(path_to_SXTL_dir, os.path.join(ins_folder, dirname), input_prefix, output_prefix, use_wine,

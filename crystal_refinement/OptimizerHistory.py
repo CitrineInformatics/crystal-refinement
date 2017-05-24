@@ -1,4 +1,4 @@
-import copy, random, utils, math
+import copy, random, math
 from graphviz import Digraph
 import numpy as np
 
@@ -163,12 +163,13 @@ class OptimizerHistory:
     """
     Define class to hold information optimizer history information
     """
-    def __init__(self, driver, ins_file, score_weighting=1.0, max_n_leaves=50):
+    def __init__(self, driver, utils, ins_file, score_weighting=1.0, max_n_leaves=50):
         self.driver = driver
+        self.utils = utils
         self.score_weighting = score_weighting
         res = self.driver.run_SHELXTL(ins_file)
-        bonds = utils.get_bonds(self.driver, res)
-        self.head = OptimizerIteration(None, ins_file, res, utils.score_compound_bonds(bonds, ins_file),
+        bonds = self.utils.get_bonds(self.driver, res)
+        self.head = OptimizerIteration(None, ins_file, res, self.utils.score_compound_bonds(bonds, ins_file),
                                        score_weighting=self.score_weighting)
 
         self.leaves = [self.head]
@@ -186,10 +187,10 @@ class OptimizerHistory:
             return None
         # If refinement is unstable, no cif file will be generated. The iteration should fail then
         try:
-            bonds = utils.get_bonds(self.driver, res)
+            bonds = self.utils.get_bonds(self.driver, res)
         except (IndexError, ZeroDivisionError):
             return None
-        new_iter = OptimizerIteration(parent_iteration, ins_file, res, utils.score_compound_bonds(bonds, ins_file),
+        new_iter = OptimizerIteration(parent_iteration, ins_file, res, self.utils.score_compound_bonds(bonds, ins_file),
                                       score_weighting=self.score_weighting, annotation=annotation)
         return new_iter
 
