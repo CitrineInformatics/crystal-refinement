@@ -65,7 +65,7 @@ The optimizer tries the following steps in order:
 6) Try anisotropy 
 
 At each step, the optimization takes into account both the fit R1 value as well as the bond lengths.
-The idea bond lengths can be determined by 3 different methods:
+The ideal bond lengths can be determined by 3 different methods:
 1) User input via the bond_length argument to the Optimizer class
 2) A machine learning model for bond length hosted at citrination.com.  To use this model, the user must have a free account on the public Citrination site.
 3) Covalent radii of the elements
