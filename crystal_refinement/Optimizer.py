@@ -127,8 +127,10 @@ class Optimizer:
             if self.history.get_best_history()[-1].r1 > 0.1:
                 f.write("High final R1 score, the optimization may not have been successful\n")
             f.write(self.utils.get_report())
-            print "Report on optimization process written to " + os.path.join(self.path_to_ins, "optimizer_results/report.txt")
-            print "Output res files for top {} results saved in ".format(self.n_results) + os.path.join(self.path_to_ins, "optimizer_results/")
+            print "Report on optimization process written to " + os.path.join(results_path, "report.txt")
+            print "Output res files for top {} results saved in ".format(self.n_results) + results_path
+        self.generate_graph(os.path.join(results_path, "optimization_graph"))
+        print "Graph of optimization process saved to " + os.path.join(results_path, "optimization_graph.pdf")
         sorted_leaves = self.history.head.get_sorted_leaves()
         for i in range(0, min(self.n_results, len(self.history.leaves))):
             with open(os.path.join(results_path, "{}.res".format(min(self.n_results, len(self.history.leaves)))), 'w') as f:

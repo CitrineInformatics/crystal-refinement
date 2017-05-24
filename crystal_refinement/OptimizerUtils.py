@@ -4,6 +4,7 @@ import re, copy, itertools, os
 from collections import defaultdict
 from pymatgen.io.cif import CifParser
 from citrination_client import CitrinationClient
+import warnings
 
 class OptimizerUtils:
     """
@@ -13,7 +14,15 @@ class OptimizerUtils:
     def __init__(self, shelx_file, bond_lengths=None, mixing_pairs=None, use_ml_model=False):
         self.element_list = [str(Element(el.capitalize())) for el in shelx_file.elements]
         if use_ml_model:
-            self.ml_model = CitrinationClient(os.environ["CITRINATION_API_KEY"])
+            try:
+                self.ml_model = CitrinationClient(os.environ["CITRINATION_API_KEY"])
+            except KeyError:
+                warnings.warn("To use the machine learning model, you need a Citrination account.")
+                print "To use the machine learning bond length model, you need a free account from citrination.com. " +\
+                      "Please set the environment variable " + \
+                      "CITRINATION_API_KEY using your Citrination API key. "
+                print "Defaulting to simple atomic radii bond length model."
+                self.ml_model = None
             self.prediction_cache = {}
         else:
             self.ml_model = None
@@ -55,7 +64,7 @@ class OptimizerUtils:
             report += "User defined bond lengths:\n"
             report += "Bond: {}-{}, length: {:.3f} ang\n".format(elements[0], elements[1], bond_length)
         if self.ml_model is None:
-            report += "Atomic radii lengths:\n"
+            report += "Bond lengths as calculated based on atomic radii:\n"
             for i in range(len(self.element_list)):
                 for j in range(i, len(self.element_list)):
                     el1 = self.element_list[i]
@@ -63,11 +72,11 @@ class OptimizerUtils:
                 report += "Bond: {}-{}, length: {:.3f} ang\n".format(el1, el2, Element(el1).atomic_radius + Element(el2).atomic_radius)
 
         else:
-            report += "ML model bond lengths:\n"
+            report += "Bond lengths as predicted by Citrination machine learning model:\n"
             for k, v in sorted(self.prediction_cache.items()):
                 report += "Bond: {}-{}, length: {:.3f} ang, formula: {}\n".format(k[0], k[1], v[0], k[2])
                 if v[1] == 0.0:
-                    report += ", Used atomic radii instead of model due to high uncertainty\n"
+                    report += "Note: This bond length based on atomic radii due to high machine learning model uncertainty\n\n"
                 else:
                     report += "\n"
         report += "\n"
