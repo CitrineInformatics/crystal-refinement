@@ -55,19 +55,19 @@ class OptimizerUtils:
             report += "User defined bond lengths:\n"
             report += "Bond: {}-{}, length: {:.3f} ang\n".format(elements[0], elements[1], bond_length)
         if self.ml_model is None:
-            report += "Naive bond lengths:\n"
+            report += "Atomic radii lengths:\n"
             for i in range(len(self.element_list)):
                 for j in range(i, len(self.element_list)):
                     el1 = self.element_list[i]
                     el2 = self.element_list[j]
-                report += "Bond: {}-{}, length: {:.3f} ang".format(el1, el2, Element(el1).atomic_radius + Element(el2).atomic_radius)
+                report += "Bond: {}-{}, length: {:.3f} ang\n".format(el1, el2, Element(el1).atomic_radius + Element(el2).atomic_radius)
 
         else:
             report += "ML model bond lengths:\n"
             for k, v in sorted(self.prediction_cache.items()):
-                report += "Bond: {}-{}, length: {:.3f} ang, formula: {}".format(k[0], k[1], v[0], k[2])
+                report += "Bond: {}-{}, length: {:.3f} ang, formula: {}\n".format(k[0], k[1], v[0], k[2])
                 if v[1] == 0.0:
-                    report += ", Used naive bond length instead of model due to high uncertainty\n"
+                    report += ", Used atomic radii instead of model due to high uncertainty\n"
                 else:
                     report += "\n"
         report += "\n"
