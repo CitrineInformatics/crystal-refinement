@@ -33,7 +33,7 @@ class OptimizerUtils:
 
     def get_ml_prediction(self, el1, el2, shelx_file):
         formula = shelx_file.get_analytic_formula()
-        prediction_key = (el1, el2, formula)
+        prediction_key = (self.get_bond_key(el1, el2), formula)
         if prediction_key in self.prediction_cache:
             return self.prediction_cache[prediction_key][0]
         try:
@@ -65,7 +65,7 @@ class OptimizerUtils:
         else:
             report += "ML model bond lengths:\n"
             for k, v in sorted(self.prediction_cache.items()):
-                report += "Bond: {}-{}, length: {:.3f} ang, formula: {}\n".format(k[0], k[1], v[0], k[2])
+                report += "Bond: {}, length: {:.3f} ang, formula: {}\n".format(k[0], v[0], k[1])
                 if v[1] == 0.0:
                     report += ", Used atomic radii instead of model due to high uncertainty\n"
                 else:
@@ -193,7 +193,7 @@ class OptimizerUtils:
         return map(lambda tup: (int(re.search("\d+", tup[0]).group(0)), tup[1]), self.get_site_bond_scores(bonds, shelx_file, n_bonds=n_bonds))
 
     def get_bond_key(self, el1, el2):
-        return ",".join(sorted([el1, el2]))
+        return "-".join(sorted([el1, el2]))
 
     def get_ideal_bond_length(self, specie_name1, specie_name2, shelx_file):
         """
