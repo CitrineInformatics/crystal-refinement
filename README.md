@@ -38,7 +38,7 @@ To run an example optimization on the ins file in the example folder:
 ```sh
 cd example  
 python example.py --path-to-xl /path/to/xl.exe --path-to-xs /path/to/xs.exe --path-to-ins /path/to/insfile  
---input_prefix input --output_prefix output  
+--input-prefix input --output-prefix output  
 ```
 
 For example, I might run:  
