@@ -127,9 +127,10 @@ class Optimizer:
             if self.history.get_best_history()[-1].r1 > 0.1:
                 f.write("High final R1 score, the optimization may not have been successful\n")
             f.write(self.utils.get_report())
+        sorted_leaves = self.history.head.get_sorted_leaves()
         for i in range(1, min(self.n_results, len(self.history.leaves)) + 1):
             with open(os.path.join(results_path, "{}.res".format(i)), 'w') as f:
-                f.write(self.history.get_best_history()[-1*i].res_file.filetxt)
+                f.write(sorted_leaves[i-1].res_file.filetxt)
         # bonds = self.utils.get_bonds(self.driver, self.history.get_best_history()[-1].res_file)
         # bond_by_atom = defaultdict(lambda: [])
         # for bond in bonds:

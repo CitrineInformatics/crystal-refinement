@@ -56,26 +56,31 @@ class OptimizerIteration:
         dot = Digraph()
         node_label = str(random.getrandbits(32))
         dot.node(node_label, str(self.r1), color="green")
-        best = self.get_best()
+        sorted_leaves = self.get_sorted_leaves()
         for i, child in enumerate(self.children):
-            child._generate_graph(str(random.getrandbits(32)), node_label, dot, best)
+            child._generate_graph(str(random.getrandbits(32)), node_label, dot, sorted_leaves)
         dot.render(output_file, view=False)
 
-    def _generate_graph(self, node_label, parent_label, dot, best):
+    def _generate_graph(self, node_label, parent_label, dot, sorted_leaves):
         highlight = False
         for i, child in enumerate(self.children):
-            if child._generate_graph(str(random.getrandbits(32)), node_label, dot, best):
+            if child._generate_graph(str(random.getrandbits(32)), node_label, dot, sorted_leaves):
                 highlight = True
         if len(self.children) == 0:
-            if self == best:
+            rank = sorted_leaves.index(self)
+            if rank == 0:
                 highlight = True
         color = "black"
         if highlight:
             color = "green"
         if self.dead_branch:
             color = "red"
-
-        dot.node(node_label, "r1: {}\nbond: {}\noverall:{}".format(self.r1, self.bond_score, self.get_score()), color=color)
+        if len(self.children) == 0:
+            dot.node(node_label, "r1: {}\nbond: {}\noverall:{}\n rank:{}"
+                     .format(self.r1, self.bond_score, self.get_score(), rank + 1), color=color)
+        else:
+            dot.node(node_label, "r1: {}\nbond: {}\noverall:{}".format(self.r1, self.bond_score, self.get_score()),
+                     color=color)
         dot.edge(parent_label, node_label, color=color, label=self.annotation)
 
         return highlight
@@ -85,11 +90,11 @@ class OptimizerIteration:
         dot = Digraph()
         node_label = str(random.getrandbits(32))
         dot.node(node_label, "r1: {}\nbond: {}\noverall:{}".format(self.r1, self.bond_score, self.get_score()), color="green")
-        best = self.get_best()
-        self._generate_truncated_graph(node_label, dot, best)
+        sorted_leaves = self.get_sorted_leaves()
+        self._generate_truncated_graph(node_label, dot, sorted_leaves)
         dot.render(output_file, view=False)
 
-    def _generate_truncated_graph(self, node_label, dot, best):
+    def _generate_truncated_graph(self, node_label, dot, sorted_leaves):
         # The parent node (this) controls the rendering of it's child nodes
         # if all children are dead branches, don't render any children
         highlight = False
@@ -99,15 +104,22 @@ class OptimizerIteration:
             if child.is_dead_branch():
                 color = "red"
             else:
-                if child._generate_truncated_graph(child_label, dot, best):
+                if child._generate_truncated_graph(child_label, dot, sorted_leaves):
                     color = "green"
                     highlight = True
-            dot.node(child_label, "r1: {}\nbond: {}\noverall:{}".format(child.r1, child.bond_score, child.get_score()),
-                     color=color)
+            if len(child.children) == 0:
+                rank = sorted_leaves.index(child)
+                dot.node(child_label, "r1: {}\nbond: {}\noverall:{}\n rank:{}"
+                         .format(child.r1, child.bond_score, child.get_score(), rank + 1),
+                         color=color)
+            else:
+                dot.node(child_label, "r1: {}\nbond: {}\noverall:{}".format(child.r1, child.bond_score, child.get_score()),
+                         color=color)
             dot.edge(node_label, child_label, color=color, label=child.annotation)
 
         if len(self.children) == 0:
-            if self == best:
+            rank = sorted_leaves.index(self)
+            if rank == 0:
                 highlight = True
 
         return highlight
@@ -154,9 +166,6 @@ class OptimizerIteration:
 
     def get_sorted_leaves(self):
         return sorted(self.get_leaves(), key=lambda iteration: iteration.get_score())
-
-    def get_best(self):
-        return self.get_sorted_leaves()[0]
 
 
 class OptimizerHistory:
