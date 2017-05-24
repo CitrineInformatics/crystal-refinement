@@ -12,7 +12,7 @@ class Optimizer:
     Class for performing single crystal refinement
     """
     def __init__(self, path_to_xl, path_to_xs, path_to_ins, input_prefix, output_prefix, use_wine=False,
-                 write_graph=True, bond_lengths=None, mixing_pairs=None, use_ml_model=False,
+                 bond_lengths=None, mixing_pairs=None, use_ml_model=False,
                  r1_similarity_threshold=0.0075, occupancy_threshold=0.02, r1_threshold=0.1, score_weighting=0.8,
                  max_n_leaves=50, least_squares_iterations=4, n_results=10):
         """
@@ -22,12 +22,11 @@ class Optimizer:
         :param input_prefix: prefix of ins file (e.g. for file.ins, the prefix would be "file")
         :param output_prefix: prefix of the result file that the optimizer will output
         :param use_wine: In order to run Windows executables on a mac, the wine app can be used.
-        :param write_graph: If True, will write tree graph of optimizer paths to an image file
         :param bond_lengths: A list of prescribed ideal bond lengths in Angstroms.  Should be in the form of triples.
-            (e.g. [(Ag, Ag, 2.85)] ).  If a bond length is not specified, then it is calculated via either a machine
+            (e.g. [('Ag', 'Ag', 2.85)] ).  If a bond length is not specified, then it is calculated via either a machine
             learning model or based on the covalent radii.
-        :param mixing_pairs: A list of acceptable elements to allow to co-occupy a site.  If no such list is provided,
-            then acceptable mixing pairs are determined based on pymatgen information.
+        :param mixing_pairs: A list of acceptable elements to allow to co-occupy a site. (e.g. [('Ge', 'Ru')])
+            If no such list is provided, then acceptable mixing pairs are determined based on pymatgen information.
         :param use_ml_model: Whether to use the bond length machine learning model to estimate bond lengths.
             If True, a machine learning model hosted at citrination.com is queried to determine the bond lengths.
                 Using this option requires obtaining a free Citrination user account and setting the CITRINATION_API_KEY
@@ -60,7 +59,6 @@ class Optimizer:
         self.input_prefix = input_prefix
         self.output_prefix = output_prefix
         self.use_wine = use_wine
-        self.write_graph = write_graph
         self.bond_lengths = bond_lengths
         self.mixing_pairs = mixing_pairs
         self.use_ml_model = use_ml_model
@@ -73,6 +71,8 @@ class Optimizer:
         self.max_n_leaves = max_n_leaves
         self.optimizer_steps = OptimizerSteps(self)
         self.n_results = n_results
+
+        self.check_inputs()
 
         # Initialize objects to be used during run()
         self.driver = SHELXDriver(ins_path=self.path_to_ins, prefix=self.output_prefix, path_to_xl=self.path_to_xl, path_to_xs=self.path_to_xs, use_wine=self.use_wine)
@@ -160,5 +160,65 @@ class Optimizer:
 
     def generate_graph(self, output_file):
         self.history.generate_graph(output_file)
+
+    def check_inputs(self):
+        if self.bond_lengths is not None:
+            assert type(self.bond_lengths) == list, "bond_lengths argument should be a list of tuples of length 3"
+            for bl in self.bond_lengths:
+                assert type(bl) == tuple, "bond_lengths argument should be a list of tuples of length 3"
+                assert len(bl) == 3, "bond_lengths argument should be a list of tuples of length 3"
+
+        if self.mixing_pairs is not None:
+            assert type(self.mixing_pairs) == list, "mixing_pairs argument should be a list of tuples of length 2"
+            for mp in self.mixing_pairs:
+                assert type(mp) == tuple, "mixing_pairs argument should be a list of tuples of length 2"
+                assert len(mp) == 2, "mixing_pairs argument should be a list of tuples of length 2"
+
+        try:
+            float(self.r1_similarity_threshold)
+        except ValueError:
+            print("r1_similarity_threshold should be numerical")
+        assert 0 <= self.r1_similarity_threshold <= 1.0, "r1_similarity_threshold should be a real number between 0.0 and 1.0"
+
+        try:
+            float(self.r1_threshold)
+        except ValueError:
+            print("r1_threshold should be numerical")
+        assert 0 <= self.r1_threshold <= 1.0, "r1_threshold should be a real number between 0.0 and 1.0"
+
+        try:
+            float(self.occupancy_threshold)
+        except ValueError:
+            print("occupancy_threshold should be numerical")
+        assert 0 <= self.occupancy_threshold <= 1.0, "occupancy_threshold should be a real number between 0.0 and 1.0"
+
+        try:
+            int(self.least_squares_iterations)
+        except ValueError:
+            print("least_squares_iterations should be numerical")
+        assert 0 < self.least_squares_iterations, "least_squares_iterations should be a positive integer"
+        assert int(self.least_squares_iterations) == self.least_squares_iterations, \
+            "least_squares_iterations should be a positive integer"
+
+        try:
+            float(self.score_weighting)
+        except ValueError:
+            print("score_weighting should be numerical")
+        assert 0 <= self.score_weighting <= 1.0, "score_weighting should be a real number between 0.0 and 1.0"
+
+        try:
+            int(self.max_n_leaves)
+        except ValueError:
+            print("max_n_leaves should be numerical")
+        assert 0 < self.max_n_leaves, "max_n_leaves should be a positive integer"
+        assert int(self.max_n_leaves) == self.max_n_leaves, "max_n_leaves should be a positive integer"
+
+        try:
+            int(self.n_results)
+        except ValueError:
+            print("n_results should be numerical")
+        assert 0 < self.n_results, "n_results should be a positive integer"
+        assert int(self.n_results) == self.n_results, "n_results should be a positive integer"
+
 
 
