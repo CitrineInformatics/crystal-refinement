@@ -102,8 +102,8 @@ class Optimizer:
         ins_file = self.driver.get_ins_file()
         ins_file.remove_command('L.S.')
         ins_file.add_command('L.S.', [str(self.least_squares_iterations)])
-        self.history = OptimizerHistory(self.driver, ins_file, self.score_weighting, self.max_n_leaves)
         self.utils = OptimizerUtils(ins_file, self.bond_lengths, self.mixing_pairs, self.use_ml_model)
+        self.history = OptimizerHistory(self.driver, self.utils, ins_file, self.score_weighting, self.max_n_leaves)
 
         # Optimization
         self.run_step(self.optimizer_steps.identify_sites)

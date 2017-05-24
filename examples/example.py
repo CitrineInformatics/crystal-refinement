@@ -4,7 +4,7 @@ file input.ins and input.hkl.
 """
 
 from optparse import OptionParser
-from crystal_refinement.optimizer import Optimizer
+from crystal_refinement.Optimizer import Optimizer
 
 # Parse command line arguments
 parser = OptionParser()
