@@ -167,6 +167,9 @@ class OptimizerIteration:
     def get_sorted_leaves(self):
         return sorted(self.get_leaves(), key=lambda iteration: iteration.get_score())
 
+    def get_best(self):
+        return self.get_sorted_leaves()[0]
+
 
 class OptimizerHistory:
     """
