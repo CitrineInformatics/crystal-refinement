@@ -68,7 +68,7 @@ At each step, the optimization takes into account both the fit R1 value as well 
 The ideal bond lengths can be determined by 3 different methods:
 1) User input via the bond_length argument to the Optimizer class
 2) A machine learning model for bond length hosted at citrination.com.  To use this model, the user must have a free account on the public Citrination site.
-3) Covalent radii of the elements
+3) Atomic radii of the elements
 
 The optimizer will follow multiple paths to see which path yields the best final fit.  For example, if two different elements both yield similar R1 values at a given crystal site, the optimizer will try both options to see which give the best final fit.  This results in a branching tree structure.
 The optimizer tree graph can be visualized using the generate_plot() method.
