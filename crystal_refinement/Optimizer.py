@@ -24,7 +24,7 @@ class Optimizer:
         :param use_wine: In order to run Windows executables on a mac, the wine app can be used.
         :param bond_lengths: A list of prescribed ideal bond lengths in Angstroms.  Should be in the form of triples.
             (e.g. [('Ag', 'Ag', 2.85)] ).  If a bond length is not specified, then it is calculated via either a machine
-            learning model or based on the covalent radii.
+            learning model or based on the atomic radii.
         :param mixing_pairs: A list of acceptable elements to allow to co-occupy a site. (e.g. [('Ge', 'Ru')])
             If no such list is provided, then acceptable mixing pairs are determined based on pymatgen information.
         :param use_ml_model: Whether to use the bond length machine learning model to estimate bond lengths.
@@ -32,8 +32,8 @@ class Optimizer:
                 Using this option requires obtaining a free Citrination user account and setting the CITRINATION_API_KEY
                 environment variable with your account API key.
                 If this machine learning model has high uncertainty for the bond lengths queried, the optimizer defaults
-                back to the covalent radii model.
-            If False, a simpler bond length model based on covalent radii is used.
+                back to the atomic radii model.
+            If False, a simpler bond length model based on atomic radii is used.
         :param r1_similarity_threshold: If r1 scores for multiple options are within this similarity threshold, the
             optimizer will branch and explore all the options.  (Should be doulbe in range (0.0, 1.0)).
         :param occupancy_threshold: Minimum deviation in occupancy or site mixing to trigger partial occupancy
@@ -127,9 +127,13 @@ class Optimizer:
             if self.history.get_best_history()[-1].r1 > 0.1:
                 f.write("High final R1 score, the optimization may not have been successful\n")
             f.write(self.utils.get_report())
+            print "Report on optimization process written to " + os.path.join(results_path, "report.txt")
+            print "Output res files for top {} results saved in ".format(self.n_results) + results_path
+        self.generate_graph(os.path.join(results_path, "optimization_graph"))
+        print "Graph of optimization process saved to " + os.path.join(results_path, "optimization_graph.pdf")
         sorted_leaves = self.history.head.get_sorted_leaves()
-        for i in range(1, min(self.n_results, len(self.history.leaves)) + 1):
-            with open(os.path.join(results_path, "{}.res".format(i)), 'w') as f:
+        for i in range(0, min(self.n_results, len(self.history.leaves))):
+            with open(os.path.join(results_path, "{}.res".format(min(self.n_results, len(self.history.leaves)))), 'w') as f:
                 f.write(sorted_leaves[i-1].res_file.filetxt)
         # bonds = self.utils.get_bonds(self.driver, self.history.get_best_history()[-1].res_file)
         # bond_by_atom = defaultdict(lambda: [])
