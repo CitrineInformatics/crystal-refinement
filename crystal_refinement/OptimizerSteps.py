@@ -32,25 +32,21 @@ class OptimizerSteps:
         """
         ins_file = initial.get_res()
         shortest_possible_bond = self.optimizer.utils.get_shortest_bond(ins_file)
-        # print shortest_possible_bond
         prev_iteration = initial
         for i in range(5):
             ins_file = prev_iteration.get_res()
             to_delete = set()
             for bond in sorted(self.optimizer.utils.get_bonds(self.optimizer.driver, ins_file), key=lambda tup: tup[2]):
-                # print bond
                 # Threshold on how short the bonds are
                 if bond[2] / shortest_possible_bond < 0.75:
                     a1_num = int(re.search('\d+', bond[0]).group(0))
                     a2_num = int(re.search('\d+', bond[1]).group(0))
                     to_delete.add(max(a1_num, a2_num))
-            # print to_delete
             if len(to_delete) == 0:
                 break
             ins_file.remove_sites_by_number(to_delete)
             ins_file.renumber_sites()
             prev_iteration = self.optimizer.history.run_and_save(ins_file, prev_iteration)
-            # quit()
 
 
     def try_add_q(self, initial):
@@ -144,13 +140,13 @@ class OptimizerSteps:
                 iterations.sort(key=lambda i: i.r1)
                 # print prev_iter.res_file.crystal_sites[i].get_name()
                 for iteration in iterations:
-                    # print iteration.ins_file.crystal_sites[i].get_name(), iteration.r1, iteration.bond_score, iteration.overall_score
+                    # print iteration.ins_file.crystal_sites[i].get_name(), iteration.r1, iteration.bond_score, iteration.get_score()
                     if iteration.r1 - iterations[0].r1 < self.optimizer.r1_similarity_threshold:
                         # print "saved"
                         self.optimizer.history.save(iteration)
             self.optimizer.history.clean_history()
             # print "#"*50
-            # quit()
+        # quit()
 
 
     def change_occupancy(self, initial):
@@ -257,10 +253,6 @@ class OptimizerSteps:
 
         iteration = self.optimizer.history.run_iter(ins_file, initial, "Added anisotropy")
 
-        # If anisotropy helped, add it to the history
-        # if iteration is not None and iteration.r1 < initial.r1:
-        #     self.optimizer.history.save(iteration)
-
         if iteration is not None:
             self.optimizer.history.save(iteration)
             if iteration.r1 > initial.r1:
@@ -299,11 +291,6 @@ class OptimizerSteps:
         ins_file.commands.append(("WGHT", ins_file.suggested_weight_vals))
 
         iteration = self.optimizer.history.run_iter(ins_file, initial, "Used suggested weights")
-
-
-        # If weights helped, add it to the history
-        # if iteration is not None and iteration.r1 < initial.r1:
-        #     self.optimizer.history.save(iteration)
 
         if iteration is not None:
             self.optimizer.history.save(iteration)

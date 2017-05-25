@@ -65,7 +65,7 @@ class OptimizerUtils:
         else:
             report += "ML model bond lengths:\n"
             for k, v in sorted(self.prediction_cache.items()):
-                report += "Bond: {}, length: {:.3f} ang, formula: {}\n".format(k[0], v[0], k[1])
+                report += "Bond: {}, length: {:.3f} ang, formula: {}".format(k[0], v[0], k[1])
                 if v[1] == 0.0:
                     report += ", Used atomic radii instead of model due to high uncertainty\n"
                 else:
@@ -187,7 +187,7 @@ class OptimizerUtils:
         # Sort by which bonds are the shortest compared to what we'd expect
         return sorted(res, key=lambda tup: tup[1])
 
-    def site_mixing_priority(self, bonds, shelx_file, n_bonds=4):
+    def site_mixing_priority(self, bonds, shelx_file, n_bonds=2):
 
         # Get associated site index
         return map(lambda tup: (int(re.search("\d+", tup[0]).group(0)), tup[1]), self.get_site_bond_scores(bonds, shelx_file, n_bonds=n_bonds))

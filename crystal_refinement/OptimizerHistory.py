@@ -67,7 +67,10 @@ class OptimizerIteration:
             if child._generate_graph(str(random.getrandbits(32)), node_label, dot, sorted_leaves):
                 highlight = True
         if len(self.children) == 0:
-            rank = sorted_leaves.index(self)
+            try:
+                rank = sorted_leaves.index(self)
+            except ValueError:
+                rank = -1
             if rank == 0:
                 highlight = True
         color = "black"
@@ -75,7 +78,7 @@ class OptimizerIteration:
             color = "green"
         if self.dead_branch:
             color = "red"
-        if len(self.children) == 0:
+        if len(self.children) == 0 and rank >= 0:
             dot.node(node_label, "r1: {}\nbond: {}\noverall:{}\n rank:{}"
                      .format(self.r1, self.bond_score, self.get_score(), rank + 1), color=color)
         else:
@@ -108,10 +111,15 @@ class OptimizerIteration:
                     color = "green"
                     highlight = True
             if len(child.children) == 0:
-                rank = sorted_leaves.index(child)
-                dot.node(child_label, "r1: {}\nbond: {}\noverall:{}\n rank:{}"
-                         .format(child.r1, child.bond_score, child.get_score(), rank + 1),
-                         color=color)
+                try:
+                    rank = sorted_leaves.index(child)
+                    dot.node(child_label, "r1: {}\nbond: {}\noverall:{}\n rank:{}"
+                             .format(child.r1, child.bond_score, child.get_score(), rank + 1),
+                             color=color)
+                except ValueError:
+                    dot.node(child_label,
+                             "r1: {}\nbond: {}\noverall:{}".format(child.r1, child.bond_score, child.get_score()),
+                             color=color)
             else:
                 dot.node(child_label, "r1: {}\nbond: {}\noverall:{}".format(child.r1, child.bond_score, child.get_score()),
                          color=color)
