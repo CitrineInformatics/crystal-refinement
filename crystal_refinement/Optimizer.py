@@ -13,7 +13,7 @@ class Optimizer:
     """
     def __init__(self, path_to_xl, path_to_xs, path_to_ins, input_prefix, output_prefix, use_wine=False,
                  bond_lengths=None, mixing_pairs=None, use_ml_model=False,
-                 r1_similarity_threshold=0.0075, occupancy_threshold=0.02, r1_threshold=0.1, score_weighting=0.8,
+                 r1_similarity_threshold=0.0075, occupancy_threshold=0.02, r1_threshold=0.1, score_weighting=1.0,
                  max_n_leaves=50, least_squares_iterations=4, n_results=10):
         """
         :param path_to_xl: path to xl executable (including executable file name)
@@ -42,6 +42,7 @@ class Optimizer:
             where bond lengths drive the optimization instead of r1 (Should be a double in range (0.0, 1.0)).
         :param score_weighting: Weighting of R1 score versus bond length score when choosing optimal path.
             A value of 1.0 corresponds to R1 only.  (Should be a double in range (0.0, 1.0)).
+            Recommended range is (0.8, 1.0)).
         :param max_n_leaves: Maximum number of optimization paths to follow at any given optimization step.
             A higher value may give a more optimal path, but will be more computationally expensive.
             (Should be positive integer).
@@ -133,8 +134,8 @@ class Optimizer:
         print "Graph of optimization process saved to " + os.path.join(results_path, "optimization_graph.pdf")
         sorted_leaves = self.history.head.get_sorted_leaves()
         for i in range(0, min(self.n_results, len(self.history.leaves))):
-            with open(os.path.join(results_path, "{}.res".format(min(self.n_results, len(self.history.leaves)))), 'w') as f:
-                f.write(sorted_leaves[i-1].res_file.filetxt)
+            with open(os.path.join(results_path, "{}.res".format(i)), 'w') as f:
+                f.write(sorted_leaves[i].res_file.filetxt)
         # bonds = self.utils.get_bonds(self.driver, self.history.get_best_history()[-1].res_file)
         # bond_by_atom = defaultdict(lambda: [])
         # for bond in bonds:

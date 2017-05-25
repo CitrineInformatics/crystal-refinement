@@ -52,7 +52,12 @@ class SHELXDriver:
         """
         with open(self.ins_file, 'w') as f:
             f.write(ins_file_obj.get_ins_text())
-        self.run_SHELXTL_command(suppress_output=suppress_output, cmd=cmd)
+        output = self.run_SHELXTL_command(suppress_output=suppress_output, cmd=cmd)
+        if "** Absolute structure probably wrong - invert and repeat refinement **" in output:
+            with open(self.ins_file, 'w') as f:
+                ins_file_obj.add_command("MOVE", values=["1", "1", "1", "-1"])
+                f.write(ins_file_obj.get_ins_text())
+            self.run_SHELXTL_command(suppress_output=suppress_output, cmd=cmd)
         if not self.has_valid_res_file():
             return None
         return self.get_res_file()
@@ -69,10 +74,10 @@ class SHELXDriver:
             command_args = [self.path_to_xl, self.file_prefix]
         if self.use_wine:
             command_args = ["wine"] + command_args
-        if suppress_output:
-            subprocess.call(command_args, stdout=open(os.devnull, "w"))
-        else:
-            subprocess.call(command_args)
+        output = subprocess.check_output(command_args)
+        if not suppress_output:
+            print output
+        return output
 
     def has_valid_res_file(self):
         """

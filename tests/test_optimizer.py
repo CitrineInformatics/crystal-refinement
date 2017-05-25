@@ -81,7 +81,7 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
 def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix="temp", use_wine=False,
                generate_graph=False, truncated_graph=False, graph_path="", graph_name="out"):
     opt = Optimizer(os.path.join(path_to_SXTL_dir, "xl.exe"), os.path.join(path_to_SXTL_dir, "xs.exe"), ins_path, input_prefix,
-            output_prefix, use_wine=use_wine, n_results=5, use_ml_model=True, max_n_leaves=20, mixing_pairs=[("Ga", "Ge")])
+            output_prefix, use_wine=use_wine, n_results=5, use_ml_model=False, max_n_leaves=20, score_weighting=1.0)#, mixing_pairs=[("Ga", "Ge")])
     opt.run()
     if generate_graph:
         if truncated_graph:
@@ -138,7 +138,7 @@ def main():
     # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data2/EASY"
     # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data2/Partial occupancy"
     # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data2/mixing"
-    subdir = "!Ba4Ga4GeSe12"
+    subdir = "mar1232_RbCdGeAs2"
     graph_output_path = "/Users/eantono/Documents/src/xtal_refinement/output"
     # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
     # ins_folder = "/Users/julialing/Documents/DataScience/crystal_refinement/single_crystal_data/"
