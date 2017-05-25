@@ -76,7 +76,7 @@ class OptimizerUtils:
             for k, v in sorted(self.prediction_cache.items()):
                 report += "Bond: {}, length: {:.3f} ang, formula: {}".format(k[0], v[0], k[1])
                 if v[1] == 0.0:
-                    report += "Note: This bond length based on atomic radii due to high machine learning model uncertainty\n\n"
+                    report += ", Note: This bond length based on atomic radii due to high machine learning model uncertainty\n"
                 else:
                     report += "\n"
         report += "\n"
