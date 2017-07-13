@@ -18,10 +18,10 @@ class OptimizerUtils:
                 self.ml_model = CitrinationClient(os.environ["CITRINATION_API_KEY"])
             except KeyError:
                 warnings.warn("To use the machine learning model, you need a Citrination account.")
-                print "To use the machine learning bond length model, you need a free account from citrination.com. " +\
+                print("To use the machine learning bond length model, you need a free account from citrination.com. " +\
                       "Please set the environment variable " + \
-                      "CITRINATION_API_KEY using your Citrination API key. "
-                print "Defaulting to simple atomic radii bond length model."
+                      "CITRINATION_API_KEY using your Citrination API key. ")
+                print("Defaulting to simple atomic radii bond length model.")
                 self.ml_model = None
             self.prediction_cache = {}
         else:
@@ -53,7 +53,7 @@ class OptimizerUtils:
                 return self.prediction_cache[prediction_key][0]
         except Exception:
             pass
-        # print "Using naive bond length instead of bond length model for {}-{} bond in {}".format(el1, el2, formula)
+        # print("Using naive bond length instead of bond length model for {}-{} bond in {}".format(el1, el2, formula))
         self.prediction_cache[prediction_key] = [float(Element(el1).atomic_radius + Element(el2).atomic_radius), 0.0]
         return self.prediction_cache[prediction_key][0]
 
@@ -92,7 +92,7 @@ class OptimizerUtils:
             e1 = element_list[i1]
             e2 = element_list[i2]
             sp = self.get_substitution_probability(e1, e2)
-            # print e1, e2, sp
+            # print(e1, e2, sp)
             if sp > probability_threshold:
                 pairs.append(([i1, i2], sp))
 

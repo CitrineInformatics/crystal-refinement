@@ -36,8 +36,8 @@ opt = Optimizer(path_to_xl=xl_path, path_to_xs=xs_path, path_to_ins=ins_path, in
 opt.run()
 
 best_history = opt.history.get_best_history()
-print "Initial r1 = {}".format(best_history[0].r1)
-print "Optimizer r1 = {}".format(best_history[-1].r1)
+print("Initial r1 = {}".format(best_history[0].r1))
+print("Optimizer r1 = {}".format(best_history[-1].r1))
 
 
 

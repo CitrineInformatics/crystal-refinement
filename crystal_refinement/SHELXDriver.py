@@ -76,7 +76,7 @@ class SHELXDriver:
             command_args = ["wine"] + command_args
         output = subprocess.check_output(command_args)
         if not suppress_output:
-            print output
+            print(output)
         return output
 
     def has_valid_res_file(self):

@@ -118,7 +118,7 @@ class Optimizer:
         self.run_step(self.optimizer_steps.use_suggested_weights)
 
         self.driver.run_SHELXTL(self.history.get_best_history()[-1].ins_file)
-        print "Done with optimization"
+        print("Done with optimization")
         results_path = os.path.join(self.path_to_ins, "optimizer_results")
         if not os.path.exists(results_path):
             os.mkdir(results_path)
@@ -128,10 +128,10 @@ class Optimizer:
             if self.history.get_best_history()[-1].r1 > 0.1:
                 f.write("High final R1 score, the optimization may not have been successful\n")
             f.write(self.utils.get_report())
-            print "Report on optimization process written to " + os.path.join(results_path, "report.txt")
-            print "Output res files for top {} results saved in ".format(self.n_results) + results_path
+            print("Report on optimization process written to " + os.path.join(results_path, "report.txt"))
+            print("Output res files for top {} results saved in ".format(self.n_results) + results_path)
         self.generate_graph(os.path.join(results_path, "optimization_graph"))
-        print "Graph of optimization process saved to " + os.path.join(results_path, "optimization_graph.pdf")
+        print("Graph of optimization process saved to " + os.path.join(results_path, "optimization_graph.pdf"))
         sorted_leaves = self.history.head.get_sorted_leaves()
         for i in range(0, min(self.n_results, len(self.history.leaves))):
             with open(os.path.join(results_path, "{}.res".format(i)), 'w') as f:
@@ -145,14 +145,14 @@ class Optimizer:
         # from pymatgen.core import Element
         # for atom, bonds in bond_by_atom.items():
         #     shortest = sorted(bonds, key=lambda tup: tup[1])[0]
-        #     print atom, shortest
+        #     print(atom, shortest)
         #     candidate = {"Element 1": re.sub("\d", "", atom), "Element 2": re.sub("\d", "", shortest[0]), "formula": self.history.get_best_history()[-1].res_file.get_analytic_formula()}
         #     result = CitrinationClient(os.environ["CITRINATION_API_KEY"]).predict("680", candidate)["candidates"][0]["Bond length"]
-        #     print "ml model:", shortest[1] - result[0], result
-        #     print "sum of radii:", shortest[1] - (Element(re.sub("\d", "", atom)).atomic_radius + Element(re.sub("\d", "", shortest[0])).atomic_radius), Element(re.sub("\d", "", atom)).atomic_radius + Element(re.sub("\d", "", shortest[0])).atomic_radius
-        #     print "#"*50
+        #     print("ml model:", shortest[1] - result[0], result)
+        #     print("sum of radii:", shortest[1] - (Element(re.sub("\d", "", atom)).atomic_radius + Element(re.sub("\d", "", shortest[0])).atomic_radius), Element(re.sub("\d", "", atom)).atomic_radius + Element(re.sub("\d", "", shortest[0])).atomic_radius)
+        #     print("#"*50)
 
-        # print map(lambda tup: (tup[0], sorted(tup[1])[0]), bond_by_atom.items())
+        # print(map(lambda tup: (tup[0], sorted(tup[1])[0]), bond_by_atom.items()))
 
 
     def run_step(self, step):

@@ -218,8 +218,8 @@ class OptimizerHistory:
         if len(self.leaves) > self.max_n_leaves:
             sorted_leaves = self.head.get_sorted_leaves()
             for i in range(self.max_n_leaves, len(self.leaves)):
-                # print "Dropping leaf: "
-                # print sorted_leaves[i].ins_file.get_crystal_sites_text()
+                # print("Dropping leaf: ")
+                # print(sorted_leaves[i].ins_file.get_crystal_sites_text())
                 sorted_leaves[i].dead_branch = True
             self.update_leaves()
 

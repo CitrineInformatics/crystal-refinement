@@ -90,7 +90,7 @@ class OptimizerSteps:
         r_penalty = 1.1
         bonds = self.optimizer.utils.get_bonds(self.optimizer.driver, ins_file)
         threshold = 0.1
-        # print len(ins_file.crystal_sites)
+        # print(len(ins_file.crystal_sites))
         while True:
             ins_file = initial.get_res()
             to_delete = set()
@@ -124,7 +124,7 @@ class OptimizerSteps:
         order = [s.site_number - 1 for s in sorted_sites]
         num_elems = len(ins_file.elements)
 
-        # print ins_file.get_crystal_sites_text()
+        # print(ins_file.get_crystal_sites_text())
         for i in order:
             for prev_iter in initial.get_leaves():
                 ins_file = prev_iter.get_res()
@@ -138,14 +138,14 @@ class OptimizerSteps:
                     if iteration is not None:
                         iterations.append(iteration)
                 iterations.sort(key=lambda i: i.r1)
-                # print prev_iter.res_file.crystal_sites[i].get_name()
+                # print(prev_iter.res_file.crystal_sites[i].get_name())
                 for iteration in iterations:
-                    # print iteration.ins_file.crystal_sites[i].get_name(), iteration.r1, iteration.bond_score, iteration.get_score()
+                    # print(iteration.ins_file.crystal_sites[i].get_name(), iteration.r1, iteration.bond_score, iteration.get_score())
                     if iteration.r1 - iterations[0].r1 < self.optimizer.r1_similarity_threshold:
-                        # print "saved"
+                        # print("saved")
                         self.optimizer.history.save(iteration)
             self.optimizer.history.clean_history()
-            # print "#"*50
+            # print("#"*50)
         # quit()
 
 
