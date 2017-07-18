@@ -1,5 +1,5 @@
 import subprocess, tempfile, shutil, os
-from SHELXFile import SHELXFile
+from crystal_refinement.SHELXFile import SHELXFile
 
 
 class SHELXDriver:
@@ -77,7 +77,7 @@ class SHELXDriver:
         output = subprocess.check_output(command_args)
         if not suppress_output:
             print(output)
-        return output
+        return output.decode('utf-8')
 
     def has_valid_res_file(self):
         """
