@@ -6,7 +6,7 @@ class SHELXDriver:
     """
     Interface that takes SHELXFile objects and does SHELX things (runs xl, xs, reads in and writes out files)
     """
-    def __init__(self, ins_path, prefix, path_to_xl, path_to_xs, use_wine=False):
+    def __init__(self, ins_path, prefix, path_to_xl, path_to_xs, use_wine=False, suppress_ouput=True):
         """
         :param ins_path: Path to initial ins file (output of xprep)
         :param prefix: Prefix of initial ins file
@@ -22,6 +22,7 @@ class SHELXDriver:
         self.ins_file = os.path.join(self.directory, prefix + ".ins")
         self.res_file = os.path.join(self.directory, prefix + ".res")
         self.cif_file = os.path.join(self.directory, prefix + ".cif")
+        self.suppress_output = suppress_ouput
         os.chdir(self.directory)
 
     def get_ins_file(self):
@@ -42,7 +43,7 @@ class SHELXDriver:
             res_text = f.read()
         return SHELXFile(res_text)
 
-    def run_SHELXTL(self, ins_file_obj, suppress_output=True, cmd="xl.exe"):
+    def run_SHELXTL(self, ins_file_obj, cmd="xl.exe"):
         """
         Takes SHELXFile object, runs cmd, then returns resulting SHELXFile object
         :param ins_file_obj: File object from ins file
@@ -52,17 +53,17 @@ class SHELXDriver:
         """
         with open(self.ins_file, 'w') as f:
             f.write(ins_file_obj.get_ins_text())
-        output = self.run_SHELXTL_command(suppress_output=suppress_output, cmd=cmd)
+        output = self.run_SHELXTL_command(cmd=cmd)
         if "** Absolute structure probably wrong - invert and repeat refinement **" in output:
             with open(self.ins_file, 'w') as f:
                 ins_file_obj.add_command("MOVE", values=["1", "1", "1", "-1"])
                 f.write(ins_file_obj.get_ins_text())
-            self.run_SHELXTL_command(suppress_output=suppress_output, cmd=cmd)
+            self.run_SHELXTL_command(cmd=cmd)
         if not self.has_valid_res_file():
             return None
         return self.get_res_file()
 
-    def run_SHELXTL_command(self, cmd="xl", suppress_output=True):
+    def run_SHELXTL_command(self, cmd="xl"):
         """
         Runs the shelx command
         :param cmd: command to call
@@ -75,7 +76,7 @@ class SHELXDriver:
         if self.use_wine:
             command_args = ["wine"] + command_args
         output = subprocess.check_output(command_args)
-        if not suppress_output:
+        if not self.suppress_output:
             print(output)
         return output
 

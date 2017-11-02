@@ -214,10 +214,19 @@ class OptimizerHistory:
                                       score_weighting=self.score_weighting, annotation=annotation)
         return new_iter
 
-    def clean_history(self):
-        if len(self.leaves) > self.max_n_leaves:
-            sorted_leaves = self.head.get_sorted_leaves()
-            for i in range(self.max_n_leaves, len(self.leaves)):
+    def clean_history(self, n_to_keep=None, branch=None):
+        """
+        Prune the tree according to overall scores.
+        :param n_to_keep: Number of leaves to keep.
+        :param branch: Branch to prune.
+        """
+        if branch is None:
+            branch = self.head
+        if n_to_keep is None:
+            n_to_keep = self.max_n_leaves
+        if len(branch.get_leaves()) > n_to_keep:
+            sorted_leaves = branch.get_sorted_leaves()
+            for i in range(n_to_keep, len(branch.get_leaves())):
                 # print("Dropping leaf: ")
                 # print(sorted_leaves[i].ins_file.get_crystal_sites_text())
                 sorted_leaves[i].dead_branch = True
@@ -231,8 +240,8 @@ class OptimizerHistory:
             iteration.parent.add_child(iteration)
         self.update_leaves()
 
-    def run_and_save(self, ins_file, parent_iteration):
-        iteration = self.run_iter(ins_file, parent_iteration)
+    def run_and_save(self, ins_file, parent_iteration, annotation=None):
+        iteration = self.run_iter(ins_file, parent_iteration, annotation)
         if iteration is not None:
             self.save(iteration)
         return iteration

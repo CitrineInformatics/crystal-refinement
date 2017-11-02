@@ -16,14 +16,18 @@ class OptimizerSteps:
 
 
     def identify_sites(self, initial):
+        if self.optimizer.log_output:
+            print("Starting with {} sites".format(len(initial.get_res().crystal_sites)))
         if initial.r1 > self.optimizer.r1_threshold:
             self.try_add_q(initial)
-            self.identify_sites_by_bond_length(initial)
+            for leaf in initial.get_leaves() + [initial]:
+                self.identify_sites_by_bond_length(leaf)
         else:
             self.try_add_q(initial)
             for leaf in initial.get_leaves():
                 self.try_remove_site(leaf)
-
+        if self.optimizer.log_output:
+            print("Finished with {} sites".format(", ".join([str(len(leaf.get_res().crystal_sites)) for leaf in initial.get_leaves()])))
 
     def identify_sites_by_bond_length(self, initial):
         """
@@ -46,7 +50,12 @@ class OptimizerSteps:
                 break
             ins_file.remove_sites_by_number(to_delete)
             ins_file.renumber_sites()
-            prev_iteration = self.optimizer.history.run_and_save(ins_file, prev_iteration)
+            annotation = "Deleted {} sites based on bond length".format(len(to_delete))
+            if self.optimizer.log_output:
+                print("Trying step: {}".format(annotation))
+            prev_iteration = self.optimizer.history.run_and_save(ins_file, prev_iteration, annotation)
+            if prev_iteration is None:
+                break
 
 
     def try_add_q(self, initial):
@@ -65,6 +74,8 @@ class OptimizerSteps:
             iterations = []
             for elem in range(1, num_elems + 1):
                 ins_file.change_element(len(ins_file.crystal_sites) - 1, elem)
+                if self.optimizer.log_output:
+                    print("Trying step: {}".format(annotation))
                 iteration = self.optimizer.history.run_iter(ins_file, initial, annotation)
                 if iteration is not None:
                     iterations.append(iteration)
@@ -106,8 +117,10 @@ class OptimizerSteps:
                 break
             ins_file.remove_sites_by_number(to_delete)
             ins_file.renumber_sites()
-
-            cur_iter = self.optimizer.history.run_iter(ins_file, initial, "Removed {} site(s)".format(len(to_delete)))
+            annotation = "Removed {} site(s)".format(len(to_delete))
+            if self.optimizer.log_output:
+                print("Trying step: {}".format(annotation))
+            cur_iter = self.optimizer.history.run_iter(ins_file, initial, annotation)
 
             if cur_iter is not None and cur_iter.r1 < initial.r1 * r_penalty:
                 self.optimizer.history.save(cur_iter)
@@ -129,22 +142,29 @@ class OptimizerSteps:
             for prev_iter in initial.get_leaves():
                 ins_file = prev_iter.get_res()
                 iterations = []
+                prev = prev_iter.res_file.crystal_sites[i].get_name()
                 for elem in range(1, num_elems + 1):
                     ins_file.change_element(i, elem)
-                    prev = prev_iter.res_file.crystal_sites[i].get_name()
                     cur = ins_file.crystal_sites[i].get_name()
-                    iteration = self.optimizer.history.run_iter(ins_file, prev_iter, "Changed {} to {}".format(prev, cur))
+                    annotation = "Changed {} to {}".format(prev, cur)
+                    if self.optimizer.log_output:
+                        print("Trying step: {}".format(annotation))
+                    iteration = self.optimizer.history.run_iter(ins_file, prev_iter, annotation)
 
                     if iteration is not None:
                         iterations.append(iteration)
                 iterations.sort(key=lambda i: i.r1)
-                # print(prev_iter.res_file.crystal_sites[i].get_name())
+                # print(prev)
                 for iteration in iterations:
-                    # print(iteration.ins_file.crystal_sites[i].get_name(), iteration.r1, iteration.bond_score, iteration.get_score())
-                    if iteration.r1 - iterations[0].r1 < self.optimizer.r1_similarity_threshold:
-                        # print("saved")
+                    # print(iteration.ins_file.crystal_sites[i].get_name(), [site.get_name() for site in iteration.ins_file.crystal_sites], iteration.r1, iteration.bond_score, iteration.get_score())
+                    # if iteration.r1 - iterations[0].r1 < self.optimizer.r1_similarity_threshold:
+                    if iteration.r1 - iterations[0].r1 < self.optimizer.r1_similarity_threshold or \
+                            iteration.get_score() / iterations[0].get_score() < 1.3:
+                        # print("saved, score ratio: {}".format(iteration.get_score() / iterations[0].get_score()))
                         self.optimizer.history.save(iteration)
-            self.optimizer.history.clean_history()
+            self.optimizer.history.clean_history(branch=initial)
+            if self.optimizer.log_output:
+                print("Cleared branch history for {} site path".format(len(ins_file.crystal_sites)))
             # print("#"*50)
         # quit()
 
@@ -219,7 +239,10 @@ class OptimizerSteps:
 
                     # Graph annotation
                     mix = "{} and {}".format(ins_file.elements[pair[0]], ins_file.elements[pair[1]])
-                    iteration = self.optimizer.history.run_iter(ins_file, prev_iter, "Mixing {} on site {}".format(mix, i))
+                    annotation = "Mixing {} on site {}".format(mix, i)
+                    if self.optimizer.log_output:
+                        print("Trying step: {}".format(annotation))
+                    iteration = self.optimizer.history.run_iter(ins_file, prev_iter, annotation)
 
                     if iteration is not None:
                         occupancy_var = float(iteration.res_file.fvar_vals[-1])
@@ -235,7 +258,9 @@ class OptimizerSteps:
                     prev_iter.propagate()
                 if iterations[0].r1 - best_r1 < self.optimizer.r1_similarity_threshold:
                     self.optimizer.history.save(iterations[0])
-        self.optimizer.history.clean_history()
+        self.optimizer.history.clean_history(branch=initial)
+        if self.optimizer.log_output:
+            print("Cleared branch history for {} site path".format(len(ins_file.crystal_sites)))
         for leaf in initial.get_leaves():
             self.do_site_mixing(leaf, tried.union(set(top_priority)), pairs)
 
@@ -250,8 +275,10 @@ class OptimizerSteps:
 
         #  Try with anisotropy
         ins_file.add_anisotropy()
-
-        iteration = self.optimizer.history.run_iter(ins_file, initial, "Added anisotropy")
+        annotation = "Added anisotropy"
+        if self.optimizer.log_output:
+            print("Trying step: {}".format(annotation))
+        iteration = self.optimizer.history.run_iter(ins_file, initial, annotation)
 
         if iteration is not None:
             self.optimizer.history.save(iteration)
@@ -268,7 +295,9 @@ class OptimizerSteps:
 
         #  Try with extinguishing
         ins_file.add_exti()
-
+        annotation = "Added extinction"
+        if self.optimizer.log_output:
+            print("Trying step: {}".format(annotation))
         iteration = self.optimizer.history.run_iter(ins_file, initial, "Added extinction")
 
 
@@ -289,7 +318,9 @@ class OptimizerSteps:
         #  Try with suggested
         ins_file.remove_command("WGHT")
         ins_file.commands.append(("WGHT", ins_file.suggested_weight_vals))
-
+        annotation = "Used suggested weights"
+        if self.optimizer.log_output:
+            print("Trying step: {}".format(annotation))
         iteration = self.optimizer.history.run_iter(ins_file, initial, "Used suggested weights")
 
         if iteration is not None:

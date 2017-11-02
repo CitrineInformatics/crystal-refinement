@@ -14,7 +14,7 @@ class Optimizer:
     def __init__(self, path_to_xl, path_to_xs, path_to_ins, input_prefix, output_prefix, use_wine=False,
                  bond_lengths=None, mixing_pairs=None, use_ml_model=False,
                  r1_similarity_threshold=0.0075, occupancy_threshold=0.02, r1_threshold=0.1, score_weighting=1.0,
-                 max_n_leaves=50, least_squares_iterations=4, n_results=10):
+                 max_n_leaves=50, least_squares_iterations=4, n_results=10, suppress_output=True, log_output=False):
         """
         :param path_to_xl: path to xl executable (including executable file name)
         :param path_to_xs: path to xs executable (including executable file name)
@@ -50,7 +50,8 @@ class Optimizer:
             (Should be a positive integer).
         :param n_results: Number of final .res files to save.  For n_results=1, only the results file with the
             best final score (based on R1 and bond lengths) will be saved.  (Should be a non-negative integer).
-
+        :param suppress_output: Whether to suppress the output of the SHELXTL commands
+        :param log_output: Whether to print the optimizer logs
         """
 
         # Initialize parameters based on arguments
@@ -72,11 +73,13 @@ class Optimizer:
         self.max_n_leaves = max_n_leaves
         self.optimizer_steps = OptimizerSteps(self)
         self.n_results = n_results
+        self.log_output = log_output
 
         self.check_inputs()
 
         # Initialize objects to be used during run()
-        self.driver = SHELXDriver(ins_path=self.path_to_ins, prefix=self.output_prefix, path_to_xl=self.path_to_xl, path_to_xs=self.path_to_xs, use_wine=self.use_wine)
+        self.driver = SHELXDriver(ins_path=self.path_to_ins, prefix=self.output_prefix, path_to_xl=self.path_to_xl,
+                                  path_to_xs=self.path_to_xs, use_wine=self.use_wine, suppress_ouput=suppress_output)
         self.history = None
         self.utils = None
 
@@ -93,7 +96,7 @@ class Optimizer:
         shutil.copy(os.path.join(self.path_to_ins, self.input_prefix + ".ins"), os.path.join(self.path_to_ins, self.output_prefix + ".ins"))
 
         # Check that the ins file is direct from xprep, without having been run before
-        f = open(self.output_prefix + ".ins")
+        # f = open(self.output_prefix + ".ins")
 
         # Run first iteration using xs
         self.driver.run_SHELXTL_command(cmd="xs")
@@ -109,13 +112,19 @@ class Optimizer:
         # Optimization
         self.run_step(self.optimizer_steps.identify_sites)
         self.run_step(self.optimizer_steps.switch_elements)
+        self.history.clean_history()
         self.run_step(self.optimizer_steps.try_site_mixing)
+        self.history.clean_history()
 
         self.run_step(self.optimizer_steps.change_occupancy)
         self.run_step(self.optimizer_steps.try_exti)
         self.run_step(self.optimizer_steps.try_anisotropy)
+        pre_weight_leaves = self.history.leaves
         self.run_step(self.optimizer_steps.use_suggested_weights)
         self.run_step(self.optimizer_steps.use_suggested_weights)
+
+        for pre_weight_leaf in pre_weight_leaves:
+            self.history.clean_history(1, pre_weight_leaf)
 
         self.driver.run_SHELXTL(self.history.get_best_history()[-1].ins_file)
         print("Done with optimization")
@@ -124,9 +133,9 @@ class Optimizer:
             os.mkdir(results_path)
         with open(os.path.join(results_path, "report.txt"), 'w') as f:
             if self.history.head.r1 > 0.1:
-                f.write("High initial R1 score, there may be something wrong with the site assigments (which are actually sites)\n")
+                f.write("WARN: High initial R1 score, there may be something wrong with the assignment of sites to electron density peaks\n")
             if self.history.get_best_history()[-1].r1 > 0.1:
-                f.write("High final R1 score, the optimization may not have been successful\n")
+                f.write("WARN: High final R1 score, the optimization may not have been successful\n")
             f.write(self.utils.get_report())
             print("Report on optimization process written to " + os.path.join(results_path, "report.txt"))
             print("Output res files for top {} results saved in ".format(self.n_results) + results_path)

@@ -69,7 +69,7 @@ class OptimizerUtils:
                 for j in range(i, len(self.element_list)):
                     el1 = self.element_list[i]
                     el2 = self.element_list[j]
-                report += "Bond: {}-{}, length: {:.3f} ang\n".format(el1, el2, Element(el1).atomic_radius + Element(el2).atomic_radius)
+                    report += "Bond: {}-{}, length: {:.3f} ang\n".format(el1, el2, Element(el1).atomic_radius + Element(el2).atomic_radius)
 
         else:
             report += "Bond lengths as predicted by Citrination machine learning model:\n"
