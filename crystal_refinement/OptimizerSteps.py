@@ -159,7 +159,7 @@ class OptimizerSteps:
                     # print(iteration.ins_file.crystal_sites[i].get_name(), [site.get_name() for site in iteration.ins_file.crystal_sites], iteration.r1, iteration.bond_score, iteration.get_score())
                     # if iteration.r1 - iterations[0].r1 < self.optimizer.r1_similarity_threshold:
                     if iteration.r1 - iterations[0].r1 < self.optimizer.r1_similarity_threshold or \
-                            iteration.get_score() / iterations[0].get_score() < 1.3:
+                            iteration.get_score() / iterations[0].get_score() < self.optimizer.overall_score_ratio_threshold:
                         # print("saved, score ratio: {}".format(iteration.get_score() / iterations[0].get_score()))
                         self.optimizer.history.save(iteration)
             self.optimizer.history.clean_history(branch=initial)
