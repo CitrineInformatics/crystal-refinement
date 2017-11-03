@@ -41,6 +41,7 @@ class Optimizer:
             (Should be double in range (0.0, 1.0)).
         :param r1_threshold: Threshold to denote a high r1 score, which triggers an alternate path in the optimizer
             where bond lengths drive the optimization instead of r1 (Should be a double in range (0.0, 1.0)).
+        :param overall_score_ratio_threshold: Ratio threshold for overall score similarity to allow for branching
         :param score_weighting: Weighting of R1 score versus bond length score when choosing optimal path.
             A value of 1.0 corresponds to R1 only.  (Should be a double in range (0.0, 1.0)).
             Recommended range is (0.8, 1.0)).
