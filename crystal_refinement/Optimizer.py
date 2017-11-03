@@ -13,8 +13,9 @@ class Optimizer:
     """
     def __init__(self, path_to_xl, path_to_xs, path_to_ins, input_prefix, output_prefix, use_wine=False,
                  bond_lengths=None, mixing_pairs=None, use_ml_model=False,
-                 r1_similarity_threshold=0.0075, occupancy_threshold=0.02, r1_threshold=0.1, score_weighting=1.0,
-                 max_n_leaves=50, least_squares_iterations=4, n_results=10, suppress_output=True, log_output=False):
+                 r1_similarity_threshold=0.0075, occupancy_threshold=0.02, r1_threshold=0.1, overall_score_ratio_threshold=1.3,
+                 score_weighting=1.0, max_n_leaves=50, least_squares_iterations=4, n_results=10, suppress_output=True,
+                 log_output=False):
         """
         :param path_to_xl: path to xl executable (including executable file name)
         :param path_to_xs: path to xs executable (including executable file name)
@@ -64,7 +65,7 @@ class Optimizer:
         self.bond_lengths = bond_lengths
         self.mixing_pairs = mixing_pairs
         self.use_ml_model = use_ml_model
-        self.overall_score_similarity_threshold = 0.05
+        self.overall_score_ratio_threshold = overall_score_ratio_threshold
         self.r1_similarity_threshold = r1_similarity_threshold
         self.r1_threshold = r1_threshold
         self.occupancy_threshold = occupancy_threshold

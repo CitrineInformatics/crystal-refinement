@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='crystal_refinement',
-    version='0.0.1',
+    version='0.1.0',
     packages=['crystal_refinement'],
     url='citrine.io',
     license='BSD License',
