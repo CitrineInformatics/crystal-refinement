@@ -242,6 +242,6 @@ class OptimizerUtils:
         with open(driver.cif_file) as f:
             cif_file = CifParser.from_string(f.read())
 
-        cif_dict = cif_file.as_dict().values()[0]
+        cif_dict = list(cif_file.as_dict().values())[0]
         return zip(cif_dict["_geom_bond_atom_site_label_1"], cif_dict["_geom_bond_atom_site_label_2"],
                    [float(x.replace("(", "").replace(")", "")) for x in cif_dict["_geom_bond_distance"]])

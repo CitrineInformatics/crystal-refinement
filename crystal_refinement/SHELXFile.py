@@ -1,5 +1,5 @@
 import re, copy
-from CrystalSite import CrystalSite
+from crystal_refinement.CrystalSite import CrystalSite
 import numpy as np
 from pymatgen import Composition
 

@@ -36,7 +36,7 @@ You will also need to create an account at citrination.com
 
 To run an example optimization on the ins file in the example folder:  
 ```sh
-cd example  
+cd examples  
 python example.py --path-to-xl /path/to/xl.exe --path-to-xs /path/to/xs.exe --path-to-ins /path/to/insfile  
 --input-prefix input --output-prefix output  
 ```

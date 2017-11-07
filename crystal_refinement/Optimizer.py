@@ -1,9 +1,9 @@
-from SHELXDriver import SHELXDriver
+from crystal_refinement.SHELXDriver import SHELXDriver
 import os, re, time
 import shutil
-from OptimizerHistory import OptimizerHistory
-from OptimizerSteps import OptimizerSteps
-from OptimizerUtils import OptimizerUtils
+from crystal_refinement.OptimizerHistory import OptimizerHistory
+from crystal_refinement.OptimizerSteps import OptimizerSteps
+from crystal_refinement.OptimizerUtils import OptimizerUtils
 from collections import defaultdict
 
 

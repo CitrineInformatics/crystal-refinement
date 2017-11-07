@@ -173,7 +173,7 @@ class OptimizerSteps:
         ins_file = initial.get_res()
 
         # Want to make changes from largest displacement to smallest
-        displacements = map((lambda x: x.displacement), ins_file.crystal_sites)
+        displacements = list(map((lambda x: x.displacement), ins_file.crystal_sites))
 
         for i, displacement in sorted(enumerate(displacements), key=lambda tup: -tup[1]):
             # don't change occupancy of mixed sites
@@ -220,7 +220,7 @@ class OptimizerSteps:
     def do_site_mixing(self, initial, tried, pairs):
         ins_file = initial.get_res()
         bonds = self.optimizer.utils.get_bonds(self.optimizer.driver, ins_file)
-        mixing_priority = self.optimizer.utils.site_mixing_priority(bonds, ins_file)
+        mixing_priority = list(self.optimizer.utils.site_mixing_priority(bonds, ins_file))
         # In case of ties, find all top tied priorities
         top_priority_score = mixing_priority[0][1]
         top_priority = [priority[0] for priority in mixing_priority if priority[1] - top_priority_score < 0.5]
