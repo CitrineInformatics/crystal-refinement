@@ -208,7 +208,9 @@ class OptimizerHistory:
         # If refinement is unstable, no cif file will be generated. The iteration should fail then
         try:
             bonds = self.utils.get_bonds(self.driver, res)
-        except (IndexError, ZeroDivisionError):
+        # This throws a FileNotFound error in python3, let's just try catching everything for now...
+        # except (IndexError, ZeroDivisionError):
+        except:
             return None
         new_iter = OptimizerIteration(parent_iteration, ins_file, res, self.utils.score_compound_bonds(bonds, ins_file),
                                       score_weighting=self.score_weighting, annotation=annotation)
