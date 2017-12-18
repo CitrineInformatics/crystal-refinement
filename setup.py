@@ -8,5 +8,6 @@ setup(
     license='BSD License',
     author='jling, eantono',
     author_email='jling (at) citrine (dot) io',
-    description='Helps automate shelx for single crystal refinement'
+    description='Helps automate shelx for single crystal refinement',
+    install_requires=['pymatgen', 'citrination-client', 'numpy']
 )
