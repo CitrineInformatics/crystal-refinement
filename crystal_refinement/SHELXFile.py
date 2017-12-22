@@ -208,15 +208,19 @@ class SHELXFile:
         self.crystal_sites.append(self.q_peaks[0])
         del self.q_peaks[0]
 
-    def move_crystal_to_q(self, site_idx=-1):
+    def move_crystal_to_q(self, site_indices=-1):
         """
         Move the crystal site (at site_idx) to a q peak
         :param site_idx: Index of crystal site to move
         :return:
         """
-        site_idx = self.get_crystal_sites_by_number(site_idx)[0]
-        self.q_peaks.insert(0, self.crystal_sites[site_idx])
-        del self.crystal_sites[site_idx]
+
+        if type(site_indices) is not list:
+            site_indices = [site_indices]
+        for i in site_indices:
+            site_idx = self.get_crystal_sites_by_number(i)[0]
+            self.q_peaks.insert(0, self.crystal_sites[site_idx])
+            del self.crystal_sites[site_idx]
 
     def remove_sites_by_number(self, site_numbers):
         """
@@ -250,6 +254,52 @@ class SHELXFile:
         if site.occupancy_prefix == 1:
             self.fvar_vals.append(0.5)
             site.occupancy_prefix = len(self.fvar_vals)
+
+    def add_equal_site_mixing(self, site_number, mixing_element_indices):
+        """
+        Adds multiple occupancy of a given crystal site. Right now, only handles 2-element site mixing.
+        Enforces equal 50:50 mixing between the elements.
+        :param site_number: Crystal site index
+        :param mixing_element_indices: Indices of elements mixed at that site
+        :return:
+        """
+        assert len(mixing_element_indices) <= 2, "Error: Can only handle mixing between 2 elements"
+        site_indices = self.get_crystal_sites_by_number(site_number)
+        self.commands.append(("EXYZ", [self.elements[i] + str(site_number) for i in mixing_element_indices]))
+        self.commands.append(("EADP", [self.elements[i] + str(site_number) for i in mixing_element_indices]))
+        mixed_sites = []
+        for i, element_idx in enumerate(mixing_element_indices):
+            new_site = copy.deepcopy(self.crystal_sites[site_indices[0]])
+            new_site.el_string = self.elements[element_idx]
+            new_site.site_number = str(site_number)
+            new_site.element = element_idx + 1  # Because elements are 1-indexed
+            new_site.occupancy_prefix = self.crystal_sites[site_indices[0]].occupancy_prefix / 2
+            mixed_sites.append(new_site)
+        self.remove_sites_by_number([site_number])  # Remove original crystal site
+        self.crystal_sites.extend(mixed_sites)  # Replace with new mixed sites
+        self.crystal_sites.sort(key=lambda site: site.site_number)
+        self.mixed_site_numbers.append(site_number)
+
+    def add_site_mixing_variable_occupancy(self, site_number):
+        """
+        Sets the mixing on a site to be a free variable. Right now, only handles 2-element site mixing.
+        :param site_number: Crystal site index
+        :return:
+        """
+        site_indices = self.get_crystal_sites_by_number(site_number)
+        # If site occupancy is not already variable, add a term to fvar:
+        if self.crystal_sites[site_indices[0]].occupancy_prefix == 1:
+            self.fvar_vals.append(0.5)
+
+        assert(len(site_indices) == 2, "The site did not have two element mixing")
+        site_1 = copy.deepcopy(self.crystal_sites[0])
+        site_2 = copy.deepcopy(self.crystal_sites[0])
+        site_1.occupancy_prefix = len(self.fvar_vals)
+        site_2.occupancy_prefix = -len(self.fvar_vals)
+
+        self.remove_sites_by_number([site_number])  # Remove original crystal site
+        self.crystal_sites.extend([site_1, site_2])  # Replace with new mixed sites
+        self.crystal_sites.sort(key=lambda site: site.site_number)
 
     def add_site_mixing(self, site_number, mixing_element_indices):
         """

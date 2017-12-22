@@ -19,15 +19,21 @@ class OptimizerSteps:
         if self.optimizer.log_output:
             print("Starting with {} sites".format(len(initial.get_res().crystal_sites)))
         if initial.r1 > self.optimizer.r1_threshold:
-            self.try_add_q(initial)
-            for leaf in initial.get_leaves() + [initial]:
-                self.identify_sites_by_bond_length(leaf)
+            self.reset_origin(initial)
+            # self.try_add_q(initial)dy_bond_length(leaf)
         else:
             self.try_add_q(initial)
             for leaf in initial.get_leaves():
                 self.try_remove_site(leaf)
         if self.optimizer.log_output:
             print("Finished with {} sites".format(", ".join([str(len(leaf.get_res().crystal_sites)) for leaf in initial.get_leaves()])))
+
+
+    def reset_origin(self, initial):
+        ins_file = initial.get_res()
+        ins_file.move_q_to_crystal(range(1, len(ins_file.crystal_sites)))
+
+
 
     def identify_sites_by_bond_length(self, initial):
         """

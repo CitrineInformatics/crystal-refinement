@@ -115,9 +115,6 @@ class Optimizer:
         self.run_step(self.optimizer_steps.identify_sites)
         self.run_step(self.optimizer_steps.switch_elements)
         self.history.clean_history()
-        self.run_step(self.optimizer_steps.try_site_mixing)
-        self.history.clean_history()
-
         self.run_step(self.optimizer_steps.change_occupancy)
         self.run_step(self.optimizer_steps.try_exti)
         self.run_step(self.optimizer_steps.try_anisotropy)
@@ -127,6 +124,9 @@ class Optimizer:
 
         for pre_weight_leaf in pre_weight_leaves:
             self.history.clean_history(1, pre_weight_leaf)
+
+        self.run_step(self.optimizer_steps.try_site_mixing)
+        self.history.clean_history()
 
         self.driver.run_SHELXTL(self.history.get_best_history()[-1].ins_file)
         print("Done with optimization")
