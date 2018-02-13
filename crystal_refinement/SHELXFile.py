@@ -39,6 +39,7 @@ class SHELXFile:
         """
         lines = filetxt.split("\n")
         line_idx = 0
+        # print filetxt
 
         # First text section, break at SFAC line
         while True:
@@ -208,19 +209,15 @@ class SHELXFile:
         self.crystal_sites.append(self.q_peaks[0])
         del self.q_peaks[0]
 
-    def move_crystal_to_q(self, site_indices=-1):
+    def move_crystal_to_q(self, site_idx=-1):
         """
         Move the crystal site (at site_idx) to a q peak
         :param site_idx: Index of crystal site to move
         :return:
         """
 
-        if type(site_indices) is not list:
-            site_indices = [site_indices]
-        for i in site_indices:
-            site_idx = self.get_crystal_sites_by_number(i)[0]
-            self.q_peaks.insert(0, self.crystal_sites[site_idx])
-            del self.crystal_sites[site_idx]
+        self.q_peaks.insert(0, self.crystal_sites[site_idx])
+        del self.crystal_sites[site_idx]
 
     def remove_sites_by_number(self, site_numbers):
         """
@@ -273,7 +270,7 @@ class SHELXFile:
             new_site.el_string = self.elements[element_idx]
             new_site.site_number = str(site_number)
             new_site.element = element_idx + 1  # Because elements are 1-indexed
-            new_site.occupancy_prefix = self.crystal_sites[site_indices[0]].occupancy_prefix / 2
+            new_site.occupancy = self.crystal_sites[site_indices[0]].occupancy / 2
             mixed_sites.append(new_site)
         self.remove_sites_by_number([site_number])  # Remove original crystal site
         self.crystal_sites.extend(mixed_sites)  # Replace with new mixed sites
@@ -287,13 +284,16 @@ class SHELXFile:
         :return:
         """
         site_indices = self.get_crystal_sites_by_number(site_number)
+        # print(site_indices)
+        # for site in self.crystal_sites:
+        #     print(site.get_name())
         # If site occupancy is not already variable, add a term to fvar:
         if self.crystal_sites[site_indices[0]].occupancy_prefix == 1:
             self.fvar_vals.append(0.5)
 
-        assert(len(site_indices) == 2, "The site did not have two element mixing")
-        site_1 = copy.deepcopy(self.crystal_sites[0])
-        site_2 = copy.deepcopy(self.crystal_sites[0])
+        assert len(site_indices) == 2, "The site did not have two element mixing"
+        site_1 = copy.deepcopy(self.crystal_sites[site_indices[0]])
+        site_2 = copy.deepcopy(self.crystal_sites[site_indices[1]])
         site_1.occupancy_prefix = len(self.fvar_vals)
         site_2.occupancy_prefix = -len(self.fvar_vals)
 

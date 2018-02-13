@@ -168,12 +168,22 @@ class OptimizerIteration:
         self.children.append(new_child)
 
     def get_score(self):
-        return math.pow(self.r1, self.score_weighting) * math.pow(self.bond_score, 1 - self.score_weighting)
+        bond_score_basis = 0.1
+        # return math.pow(self.r1, self.score_weighting) + math.pow(self.bond_score, 1 - self.score_weighting)
+        # return (1.0 + math.pow(self.r1 / r1_basis, self.score_weighting)) \
+        #        * (1.0 + math.pow(self.bond_score / bond_score_basis, 1 - self.score_weighting))
+        return math.pow(self.r1, self.score_weighting) * math.pow(self.bond_score + bond_score_basis, 1 - self.score_weighting)
         # return self.r1 * self.bond_score
         # return (self.r1, len(self.res_file.mixed_site_numbers))
 
-    def get_sorted_leaves(self):
-        return sorted(self.get_leaves(), key=lambda iteration: iteration.get_score())
+    def get_sorted_leaves(self, criteria="overall_score"):
+        assert criteria in ["overall_score", "r1_only", "bond_only"], "{} is not a supported criteria".format(criteria)
+        if criteria == "overall_score":
+            return sorted(self.get_leaves(), key=lambda iteration: iteration.get_score())
+        if criteria == "r1_only":
+            return sorted(self.get_leaves(), key=lambda iteration: iteration.r1)
+        if criteria == "bond_only":
+            return sorted(self.get_leaves(), key=lambda iteration: iteration.bond_score)
 
     def get_best(self):
         return self.get_sorted_leaves()[0]
@@ -189,7 +199,7 @@ class OptimizerHistory:
         self.score_weighting = score_weighting
         res = self.driver.run_SHELXTL(ins_file)
         bonds = self.utils.get_bonds(self.driver, res)
-        self.head = OptimizerIteration(None, ins_file, res, self.utils.score_compound_bonds(bonds, ins_file),
+        self.head = OptimizerIteration(None, ins_file, res, self.utils.score_compound_bonds_relative_distance(bonds, ins_file, self.driver),
                                        score_weighting=self.score_weighting)
 
         self.leaves = [self.head]
@@ -208,15 +218,18 @@ class OptimizerHistory:
         # If refinement is unstable, no cif file will be generated. The iteration should fail then
         try:
             bonds = self.utils.get_bonds(self.driver, res)
+            if len(bonds) == 0:
+                return None
+
         # This throws a FileNotFound error in python3, let's just try catching everything for now...
         # except (IndexError, ZeroDivisionError):
         except:
             return None
-        new_iter = OptimizerIteration(parent_iteration, ins_file, res, self.utils.score_compound_bonds(bonds, ins_file),
+        new_iter = OptimizerIteration(parent_iteration, ins_file, res, self.utils.score_compound_bonds_relative_distance(bonds, res, self.driver),
                                       score_weighting=self.score_weighting, annotation=annotation)
         return new_iter
 
-    def clean_history(self, n_to_keep=None, branch=None):
+    def clean_history(self, n_to_keep=None, branch=None, criteria="overall_score"):
         """
         Prune the tree according to overall scores.
         :param n_to_keep: Number of leaves to keep.
@@ -227,7 +240,7 @@ class OptimizerHistory:
         if n_to_keep is None:
             n_to_keep = self.max_n_leaves
         if len(branch.get_leaves()) > n_to_keep:
-            sorted_leaves = branch.get_sorted_leaves()
+            sorted_leaves = branch.get_sorted_leaves(criteria)
             for i in range(n_to_keep, len(branch.get_leaves())):
                 # print("Dropping leaf: ")
                 # print(sorted_leaves[i].ins_file.get_crystal_sites_text())

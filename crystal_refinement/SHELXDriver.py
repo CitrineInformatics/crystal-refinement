@@ -1,4 +1,4 @@
-import subprocess, tempfile, shutil, os
+import subprocess, tempfile, shutil, os, re
 from SHELXFile import SHELXFile
 
 
@@ -43,7 +43,7 @@ class SHELXDriver:
             res_text = f.read()
         return SHELXFile(res_text)
 
-    def run_SHELXTL(self, ins_file_obj, cmd="xl.exe"):
+    def run_SHELXTL(self, ins_file_obj, cmd="xl.exe", suppress_output=True):
         """
         Takes SHELXFile object, runs cmd, then returns resulting SHELXFile object
         :param ins_file_obj: File object from ins file
@@ -54,16 +54,27 @@ class SHELXDriver:
         with open(self.ins_file, 'w') as f:
             f.write(ins_file_obj.get_ins_text())
         output = self.run_SHELXTL_command(cmd=cmd)
+        recognized_errors = ["** Cell contents from UNIT instruction and atom list do not agree **",
+                             "** Extinction (EXTI) or solvent water (SWAT) correction may be required **"]
         if "** Absolute structure probably wrong - invert and repeat refinement **" in output:
             with open(self.ins_file, 'w') as f:
                 ins_file_obj.add_command("MOVE", values=["1", "1", "1", "-1"])
                 f.write(ins_file_obj.get_ins_text())
             self.run_SHELXTL_command(cmd=cmd)
+        if "** NEGATIVE OCCUPANCY FOR ATOM" in output:
+            return None
         if not self.has_valid_res_file():
             return None
+
+        if "**" in output:
+            matches = re.findall("\*\*[^(*|\n)]+\*\*", output)
+            # use a regex, you don't want to throw this out if "any" matches
+            if not all(x in recognized_errors for x in matches):
+                print("Log has error:")
+                print(output)
         return self.get_res_file()
 
-    def run_SHELXTL_command(self, cmd="xl"):
+    def run_SHELXTL_command(self, cmd="xl", suppress_output=True):
         """
         Runs the shelx command
         :param cmd: command to call
@@ -76,7 +87,7 @@ class SHELXDriver:
         if self.use_wine:
             command_args = ["wine"] + command_args
         output = subprocess.check_output(command_args)
-        if not self.suppress_output:
+        if not self.suppress_output or not suppress_output:
             print(output)
         return output
 

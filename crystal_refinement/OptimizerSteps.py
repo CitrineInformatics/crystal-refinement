@@ -31,7 +31,8 @@ class OptimizerSteps:
 
     def reset_origin(self, initial):
         ins_file = initial.get_res()
-        ins_file.move_q_to_crystal(range(1, len(ins_file.crystal_sites)))
+        for i in reversed(range(1, len(ins_file.crystal_sites))):
+            ins_file.move_crystal_to_q(i)
 
 
 
@@ -164,13 +165,20 @@ class OptimizerSteps:
                 for iteration in iterations:
                     # print(iteration.ins_file.crystal_sites[i].get_name(), [site.get_name() for site in iteration.ins_file.crystal_sites], iteration.r1, iteration.bond_score, iteration.get_score())
                     # if iteration.r1 - iterations[0].r1 < self.optimizer.r1_similarity_threshold:
+                    # print(len(iterations))
+                    # print([x.get_score() for x in iterations])
                     if iteration.r1 - iterations[0].r1 < self.optimizer.r1_similarity_threshold or \
                             iteration.get_score() / iterations[0].get_score() < self.optimizer.overall_score_ratio_threshold:
                         # print("saved, score ratio: {}".format(iteration.get_score() / iterations[0].get_score()))
                         self.optimizer.history.save(iteration)
-            self.optimizer.history.clean_history(branch=initial)
-            if self.optimizer.log_output:
-                print("Cleared branch history for {} site path".format(len(ins_file.crystal_sites)))
+            if i == order[-1]:
+                self.optimizer.history.clean_history(branch=initial)
+                if self.optimizer.log_output:
+                    print("Cleared branch history for {} site path according to overall score".format(len(ins_file.crystal_sites)))
+            else:
+                self.optimizer.history.clean_history(branch=initial, criteria="r1_only")
+                if self.optimizer.log_output:
+                    print("Cleared branch history for {} site path according to r1 only".format(len(ins_file.crystal_sites)))
             # print("#"*50)
         # quit()
 
@@ -232,6 +240,8 @@ class OptimizerSteps:
         top_priority = [priority[0] for priority in mixing_priority if priority[1] - top_priority_score < 0.5]
         # For each of these top priorities, try site mixing
         if all([i in tried for i in top_priority]):
+            if self.optimizer.ensure_identified_elements:
+                self.ensure_identified_elements_are_present(initial)
             return
         for i in top_priority:
             if i in tried:
@@ -241,20 +251,28 @@ class OptimizerSteps:
                 iterations = []
                 for pair in pairs:
                     ins_file = prev_iter.get_res()
-                    ins_file.add_site_mixing(site_number=i, mixing_element_indices=pair)
+                    ins_file.add_equal_site_mixing(site_number=i, mixing_element_indices=pair)
 
                     # Graph annotation
-                    mix = "{} and {}".format(ins_file.elements[pair[0]], ins_file.elements[pair[1]])
-                    annotation = "Mixing {} on site {}".format(mix, i)
+                    mix = "{} and {} equally".format(ins_file.elements[pair[0]], ins_file.elements[pair[1]])
+                    annotation = "Mixing {} on site {} equally".format(mix, i)
                     if self.optimizer.log_output:
                         print("Trying step: {}".format(annotation))
                     iteration = self.optimizer.history.run_iter(ins_file, prev_iter, annotation)
 
                     if iteration is not None:
-                        occupancy_var = float(iteration.res_file.fvar_vals[-1])
-                        # Only include occupancies that are actually split
-                        if occupancy_var > self.optimizer.occupancy_threshold and occupancy_var < (1 - self.optimizer.occupancy_threshold):
-                            iterations.append(iteration)
+                        if prev_iter.r1 - iteration.r1 < self.optimizer.r1_similarity_threshold:
+                            ins_file = iteration.get_res()
+                            ins_file.add_site_mixing_variable_occupancy(i)
+                            annotation = "Adding variable occupancy for {} on site {}".format(mix, i)
+                            if self.optimizer.log_output:
+                                print("Trying step: {}".format(annotation))
+                            variable_occupancy_iteration = self.optimizer.history.run_iter(ins_file, iteration, annotation)
+                            if variable_occupancy_iteration is not None:
+                                occupancy_var = float(variable_occupancy_iteration.get_res().fvar_vals[-1])
+                                # Only include occupancies that are actually split
+                                if occupancy_var > self.optimizer.occupancy_threshold and occupancy_var < (1 - self.optimizer.occupancy_threshold):
+                                    iterations.append(variable_occupancy_iteration)
 
                 if len(iterations) == 0:
                     continue
@@ -333,3 +351,23 @@ class OptimizerSteps:
             self.optimizer.history.save(iteration)
             if iteration.r1 > initial.r1:
                 initial.propagate()
+
+
+    def ensure_identified_elements_are_present(self, initial):
+        """
+        Filter the given branch if there are missing elements
+        :param initial:
+        :return:
+        """
+
+        ins_file = initial.get_res()
+
+        identified_elements = set(ins_file.elements)
+        result_elements = set()
+        for site in ins_file.crystal_sites:
+            result_elements.add(site.el_string.upper())
+        missing = identified_elements.difference(result_elements)
+        if len(missing) > 0:
+            if self.optimizer.log_output:
+                print("Truncated branch due to missing elements: {}".format(" ".join(missing)))
+            self.optimizer.history.clean_history(n_to_keep=0, branch=initial)

@@ -30,6 +30,14 @@ class OptimizerUtils:
             self.bond_lengths = dict()
         else:
             self.bond_lengths = {self.get_bond_key(el1, el2): bond_length for el1, el2, bond_length in bond_lengths}
+
+        for el1 in self.element_list:
+            for el2 in self.element_list:
+                bond_key = self.get_bond_key(el1, el2)
+                if bond_key not in self.bond_lengths.keys():
+                    self.bond_lengths[bond_key] = self.get_bond_length(el1, el2, shelx_file)
+
+
         if mixing_pairs is None:
             self.mixing_pairs = self.get_mixing_pairs(shelx_file, probability_threshold=2E-4)
         else:
@@ -178,6 +186,135 @@ class OptimizerUtils:
         # Calculate amount which bonds deviate from the expected bond length
         return -((bond[2] - ideal_bond_length) / 2) ** 2
 
+    def get_bond_score_relative_distance(self, bond, all_nn_bonds):
+        """
+        :param bond: The bond (el1, el2, length)
+        :param all_nn_bonds: All nearest neighbor bonds in the compound
+        :param shelx_file:
+        :return: bond score. Lower is better. For bonds that are ordered differently than ideal, the score will be
+        appended with the difference between the bond lengths (some notion of how "wrong" it is).
+        """
+
+        score = 0.0
+        ideal_bond_length = self.bond_lengths[self.get_bond_key(self.specie_to_el(bond[0]), self.specie_to_el(bond[1]))]
+        for other_bond in all_nn_bonds:
+            other_ideal_bond_length = self.bond_lengths[self.get_bond_key(self.specie_to_el(other_bond[0]), self.specie_to_el(other_bond[1]))]
+            ideal_comp = ideal_bond_length < other_ideal_bond_length
+            actual_comp = bond[2] < other_bond[2]
+            if ideal_comp != actual_comp or ideal_bond_length == other_ideal_bond_length:
+                diff = abs(bond[2] - other_bond[2])
+                if ideal_bond_length == other_ideal_bond_length:
+                    bond_score = pow(max(diff - 0.1, 0.0), 2)
+                else:
+                    bond_score = pow(diff, 2)
+                # if bond_score > 0.0:
+                #     print("Bond added to score: {}, {}, {}, {}".format(diff, bond_score, bond, other_bond))
+                score += bond_score
+
+        return score
+
+    def get_site_bond_scores_relative_distance(self, bonds, all_nn_bonds, n_bonds=4):
+        """
+        Determines priority for adding in site mixing.  Finds most problematic sites based on whether bonds
+        are shorter than expected.
+        TODO: What if bonds are longer than expected?
+        :param bonds: List of bond tuples (atom1, atom2, distance) for which to calculate priority
+        :return: List of (site number, site score) tuples sorted with decreasing priority.
+        """
+        bond_by_atom = defaultdict(lambda: [])
+        for bond in bonds:
+            bond_score = self.get_bond_score_relative_distance(bond, all_nn_bonds)
+            bond_by_atom[bond[0]].append(bond_score)
+            bond_by_atom[bond[1]].append(bond_score)
+        # Average over scores from n shortest bonds
+        res = map(lambda tup: (tup[0], sum(sorted(tup[1])[:n_bonds])), bond_by_atom.items())
+        # Sort by which bonds are the shortest compared to what we'd expect
+        return sorted(res, key=lambda tup: tup[1])
+
+    def score_compound_bonds_relative_distance(self, bonds, shelx_file, driver):
+        """
+        The smaller the better
+        :param bonds:
+        :param ml_model:
+        :return:
+        """
+
+        sorted_bonds = sorted(bonds, key=lambda tup: tup[2])
+
+        nn_bonds_by_site = {}
+
+        # print(len(shelx_file.crystal_sites))
+        for site in shelx_file.crystal_sites:
+            site_name = "{}{}".format(site.el_string, site.site_number)
+            # print site_name
+            for bond in sorted_bonds:
+                if site_name == bond[0].upper() or site_name == bond[0].upper():
+                    nn_bonds_by_site[site_name] = bond
+                    # print(bond)
+                    break
+
+
+        # for bond in bonds:
+        #     print(bond)
+
+        # print("\n\n\n")
+
+        # print("NN bonds:")
+        # for site, bond in nn_bonds_by_site.items():
+        #     print(site, bond)
+        # quit()
+
+
+        site_bond_scores = self.get_site_bond_scores_relative_distance(nn_bonds_by_site.values(), nn_bonds_by_site.values(), n_bonds=1)
+        total_stoich = 0
+        stoich_weighted_score = 0
+        for site_name, score in site_bond_scores:
+            stoich = 0
+            for site in shelx_file.crystal_sites:
+                if site.get_name().capitalize() == site_name:
+                    stoich = shelx_file.get_site_stoichiometry(site)
+            total_stoich += stoich
+            stoich_weighted_score += stoich * score
+
+        # print("crystal sites:")
+        # for site in shelx_file.crystal_sites:
+        #     print(site.get_name().capitalize())
+        # print("bonds passed in:")
+        # for bond in bonds:
+        #     print(bond)
+        # if len(nn_bonds_by_site) == 0:
+            # print("bonds passed in:")
+            # for bond in bonds:
+            #     print(bond)
+            # print("bonds again:")
+            # bonds_again = self.get_bonds(driver, shelx_file)
+            # for bond in bonds_again:
+            #     print(bond)
+            # bond_by_atom = defaultdict(lambda: [])
+            # for bond in nn_bonds_by_site.values():
+            #     bond_score = self.get_bond_score_relative_distance(bond, nn_bonds_by_site.values())
+            #     bond_by_atom[bond[0]].append(bond_score)
+            #     bond_by_atom[bond[1]].append(bond_score)
+            # print(len(nn_bonds_by_site.values()))
+            # print(len(bond_by_atom))
+            # Average over scores from n shortest bonds
+            # res = map(lambda tup: (tup[0], sum(sorted(tup[1])[:1])), bond_by_atom.items())
+            # Sort by which bonds are the shortest compared to what we'd expect
+            # print len(shelx_file.crystal_sites)
+            # print(site_bond_scores)
+            # print(stoich_weighted_score, total_stoich)
+            # print("{} bonds".format(len(bonds)))
+            # print(shelx_file.get_ins_text())
+
+        # if len(site_bond_scores) < len(shelx_file.crystal_sites):
+            # stoich_weighted_score -= 50
+        # print len(shelx_file.crystal_sites)
+        # print(site_bond_scores)
+        # print(stoich_weighted_score, total_stoich)
+        # print("calculated score: {}".format(stoich_weighted_score / total_stoich))
+        return stoich_weighted_score / total_stoich
+
+
     def get_site_bond_scores(self, bonds, shelx_file, n_bonds=4):
         """
             Determines priority for adding in site mixing.  Finds most problematic sites based on whether bonds
@@ -204,6 +341,20 @@ class OptimizerUtils:
     def get_bond_key(self, el1, el2):
         return "-".join(sorted([el1, el2]))
 
+    def get_bond_length(self, el1, el2, shelx_file):
+        bond_key = self.get_bond_key(el1, el2)
+        if bond_key in self.bond_lengths:
+            return self.bond_lengths[bond_key]
+
+        if self.ml_model is not None:
+            return self.get_ml_prediction(el1, el2, shelx_file)
+
+        # Use pymatgen to get approximate bond length = sum of atomic radii
+        return Element(el1).atomic_radius + Element(el2).atomic_radius
+
+    def specie_to_el(self, specie_name):
+        return re.sub('\d', "", specie_name)
+
     def get_ideal_bond_length(self, specie_name1, specie_name2, shelx_file):
         """
         Scores the likelihood of a bond based on its deviation from an ideal bond length.
@@ -214,17 +365,9 @@ class OptimizerUtils:
         TODO: This should be covalent radii instead
         :return: ideal bond length
         """
-        el1 = re.sub('\d', "", specie_name1)
-        el2 = re.sub('\d', "", specie_name2)
-        bond_key = self.get_bond_key(el1, el2)
-        if bond_key in self.bond_lengths:
-            return self.bond_lengths[bond_key]
-
-        if self.ml_model is not None:
-            return self.get_ml_prediction(el1, el2, shelx_file)
-
-        # Use pymatgen to get approximate bond length = sum of atomic radii
-        return Element(el1).atomic_radius + Element(el2).atomic_radius
+        el1 = self.specie_to_el(specie_name1)
+        el2 = self.specie_to_el(specie_name2)
+        return self.get_bond_length(el1, el2, shelx_file)
 
     def get_bonds(self, driver, shelx_file):
         """
@@ -237,7 +380,9 @@ class OptimizerUtils:
         ins_file.add_command("ACTA")
         ins_file.remove_command("L.S.")
         ins_file.add_command("L.S.", ["1"])
-        driver.run_SHELXTL(ins_file)
+        res = driver.run_SHELXTL(ins_file, suppress_output=False)
+        if res is None:
+            return []
 
         with open(driver.cif_file) as f:
             cif_file = CifParser.from_string(f.read())
