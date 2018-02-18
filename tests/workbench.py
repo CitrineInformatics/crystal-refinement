@@ -1,6 +1,5 @@
-from crystal_refinement.SHELXFile import SHELXFile
-from crystal_refinement.SHELXDriver import SHELXDriver
 from crystal_refinement.Optimizer import Optimizer
+from crystal_refinement.SHELXDriver import SHELXDriver
 
 # input_prefix="input"
 # path_to_ins="/Users/eantono/Documents/src/xtal_refinement/examples"

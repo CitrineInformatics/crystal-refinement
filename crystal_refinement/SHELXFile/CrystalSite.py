@@ -1,6 +1,7 @@
 import numpy as np
 import re
 
+
 class CrystalSite:
     """
     Define class to hold information about a single crystal site or Q peak
@@ -51,15 +52,12 @@ class CrystalSite:
             if len(line_list) > 7:
                 self.anisotropy = np.asarray([float(x) for x in line_list[7:]])
 
-    def get_name(self):
-        return self.el_string + str(self.site_number)
-
-    def write_line(self):
+    def to_string(self):
         """
         Takes the crystal site data members and returns a list of strings which can then be written back out
         :return: line_list
         >>> cs = CrystalSite("SM2   4    0.153587    0.000000    0.432975    10.50000    0.00602".split())
-        >>> cs.write_line()
+        >>> cs.to_string()
         ['SM2', '4', '0.153587', '0.000000', '0.432975', '10.500000', '0.006020']
 
         """
@@ -71,16 +69,29 @@ class CrystalSite:
             line_list += ['{:.6f}'.format(self.electron_density)]
         if (self.anisotropy is not None):
             line_list += ['=\n'] + ['{:.6f}'.format(x) for x in self.anisotropy.tolist()]
-        return line_list
+        return " ".join(line_list)
+
+    def get_name(self):
+        return self.el_string + str(self.site_number)
+
+    def get_element(self, capitalized=False):
+        if capitalized:
+            return self.el_string.capitalize()
+        else:
+            return self.el_string
 
     def set_element(self, element):
         self.element = element
 
+    def get_position(self):
+        return self.position
+
     def set_position(self, position):
         self.position = position
 
-    def get_position(self):
-        return self.position
+    def switch_element(self, shelx_element):
+        self.element = shelx_element.index
+        self.el_string = shelx_element.name
 
 
 

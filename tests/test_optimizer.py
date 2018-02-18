@@ -2,7 +2,6 @@ import os
 import re
 import shutil
 import time
-from crystal_refinement.SHELXFile import SHELXFile
 
 from crystal_refinement.Optimizer import Optimizer
 
@@ -89,14 +88,13 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
 
     r1_tol = 2e-4
     anton_r1 = float(re.search("REM R1 =  (\d\.\d+)", open(final_res).read()).group(1))
-    nominal_formula = "".join(["{}{}".format(el.capitalize(), st) for el, st in zip(best_history[-1].ins_file.elements, best_history[-1].ins_file.formula_units)])
-    nominal_elements = set(best_history[-1].ins_file.elements)
-    result_formula = best_history[-1].res_file.get_analytic_formula()
-    result_elements = set()
-    for site in best_history[-1].res_file.crystal_sites:
-        result_elements.add(site.el_string.upper())
+    opt_res = best_history[-1].ins_file
+    nominal_formula = opt_res.get_nominal_formula()
+    nominal_elements = set(map(lambda el: el.get_name(), opt_res.elements))
+    result_formula = opt_res.get_analytic_formula()
+    result_elements = map(lambda site: site.el_string, opt_res.get_all_sites())
     anton_res_nsites, anton_res_el_lines = test_result(open(final_res).read())
-    opt_res_nsites, opt_res_el_lines = test_result(best_history[-1].res_file.get_ins_text())
+    opt_res_nsites = best_history[-1].res_file.get_n_sites()
     print(len(opt.history.leaves), "path(s) tried")
     print("Initial r1 = {}".format(best_history[0].r1))
     print("Optimizer r1 = {}".format(best_history[-1].r1))
@@ -110,8 +108,7 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
     for line in anton_res_el_lines:
         print(line)
     print("Optimizer sites:")
-    for line in opt_res_el_lines:
-        print(line)
+    print(best_history[-1].res_file.crystal_sites_string())
     print("Runtime = {}s".format(runtime))
     if best_history[-1].r1 - anton_r1 > r1_tol:
         print("Not success!")
@@ -127,7 +124,7 @@ def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix
                generate_graph=False, truncated_graph=False, graph_path="", graph_name="out"):
     opt = Optimizer(os.path.join(path_to_SXTL_dir, "xl.exe"), os.path.join(path_to_SXTL_dir, "xs.exe"), ins_path, input_prefix,
             output_prefix, use_wine=use_wine, n_results=5, use_ml_model=False, max_n_leaves=20,
-                    score_weighting=0.5, log_output=False)#, mixing_pairs=[("Ga", "Ge")])
+                    score_weighting=0.5, log_output=False, ensure_identified_elements=False)
     opt.run()
     if generate_graph:
         if truncated_graph:

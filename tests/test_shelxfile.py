@@ -1,4 +1,4 @@
-from crystal_refinement.SHELXFile import SHELXFile
+from crystal_refinement.SHELXFile.SHELXFile import SHELXFile
 
 def main():
     test_file = "/Users/julialing/Documents/DataScience/crystal_refinement/4-2-1-4_single_crystal/Example_from_slides/7.ins"

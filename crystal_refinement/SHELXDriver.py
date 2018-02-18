@@ -1,5 +1,8 @@
-import subprocess, tempfile, shutil, os, re
-from SHELXFile import SHELXFile
+import os
+import re
+import subprocess
+
+from crystal_refinement.SHELXFile.SHELXFile import SHELXFile
 
 
 class SHELXDriver:
@@ -43,7 +46,7 @@ class SHELXDriver:
             res_text = f.read()
         return SHELXFile(res_text)
 
-    def run_SHELXTL(self, ins_file_obj, cmd="xl.exe", suppress_output=True):
+    def run_SHELXTL(self, ins_file_obj, cmd="xl.exe"):
         """
         Takes SHELXFile object, runs cmd, then returns resulting SHELXFile object
         :param ins_file_obj: File object from ins file
@@ -52,14 +55,14 @@ class SHELXDriver:
         :return: File object from res file
         """
         with open(self.ins_file, 'w') as f:
-            f.write(ins_file_obj.get_ins_text())
+            f.write(ins_file_obj.to_string())
         output = self.run_SHELXTL_command(cmd=cmd)
         recognized_errors = ["** Cell contents from UNIT instruction and atom list do not agree **",
                              "** Extinction (EXTI) or solvent water (SWAT) correction may be required **"]
         if "** Absolute structure probably wrong - invert and repeat refinement **" in output:
             with open(self.ins_file, 'w') as f:
                 ins_file_obj.add_command("MOVE", values=["1", "1", "1", "-1"])
-                f.write(ins_file_obj.get_ins_text())
+                f.write(ins_file_obj.to_string())
             self.run_SHELXTL_command(cmd=cmd)
         if "** NEGATIVE OCCUPANCY FOR ATOM" in output:
             return None
@@ -70,8 +73,11 @@ class SHELXDriver:
             matches = re.findall("\*\*[^(*|\n)]+\*\*", output)
             # use a regex, you don't want to throw this out if "any" matches
             if not all(x in recognized_errors for x in matches):
-                print("Log has error:")
+                print("Unrecognized error in refinement output:")
                 print(output)
+                print("INS file:")
+                print(ins_file_obj.to_string())
+
         return self.get_res_file()
 
     def run_SHELXTL_command(self, cmd="xl", suppress_output=True):

@@ -12,7 +12,7 @@ class OptimizerUtils:
     """
 
     def __init__(self, shelx_file, bond_lengths=None, mixing_pairs=None, use_ml_model=False):
-        self.element_list = [str(Element(el.capitalize())) for el in shelx_file.elements]
+        self.element_list = [str(Element(el.get_name(True))) for el in shelx_file.elements]
         if use_ml_model:
             try:
                 self.ml_model = CitrinationClient(os.environ["CITRINATION_API_KEY"])
@@ -43,9 +43,11 @@ class OptimizerUtils:
         else:
             self.mixing_pairs = []
             for el1, el2 in mixing_pairs:
-                assert el1 in self.element_list and el2 in self.element_list, "User defined mixing elements {} and {} " \
-                    "must be elements specified in the ins file".format(el1, el2)
-                self.mixing_pairs.append([self.element_list.index(el1), self.element_list.index(el2)])
+                try:
+                    self.mixing_pairs.append([shelx_file.get_element_by_name(el1),
+                                              shelx_file.get_element_by_name(el2)])
+                except KeyError:
+                    "User defined mixing elements {} and {} must be elements specified in the ins file".format(el1, el2)
 
 
     def get_ml_prediction(self, el1, el2, shelx_file):
@@ -67,7 +69,7 @@ class OptimizerUtils:
 
     def get_report(self):
         report = ""
-        report += "Mixing pairs considered: {}\n\n".format(", ".join(["({}, {})".format(self.element_list[i1], self.element_list[i2]) for i1, i2 in self.mixing_pairs]))
+        report += "Mixing pairs considered: {}\n\n".format(", ".join(["({}, {})".format(e1.get_name(), e2.get_name()) for e1, e2 in self.mixing_pairs]))
         for elements, bond_length in self.bond_lengths.items():
             report += "User defined bond lengths:\n"
             report += "Bond: {}-{}, length: {:.3f} ang\n".format(elements[0], elements[1], bond_length)
@@ -91,18 +93,15 @@ class OptimizerUtils:
         return report
 
     def get_mixing_pairs(self, shelx_file, probability_threshold):
-        element_list = [Element(el.capitalize()) for el in shelx_file.elements]
         pairs = []
 
         # For all elements in compound, calculate substitution probabilities
         # If substitution probability is > probability_threshold, then save it to pairs list.
-        for i1, i2 in itertools.combinations(range(len(element_list)), 2):
-            e1 = element_list[i1]
-            e2 = element_list[i2]
-            sp = self.get_substitution_probability(e1, e2)
+        for e1, e2 in itertools.combinations(shelx_file.elements, 2):
+            sp = self.get_substitution_probability(e1.get_pymatgen_element(), e2.get_pymatgen_element())
             # print(e1, e2, sp)
             if sp > probability_threshold:
-                pairs.append(([i1, i2], sp))
+                pairs.append(([e1, e2], sp))
 
         # Sort pairs by substitution probability (largest to smallest)
         return [tup[0] for tup in sorted(pairs, key=lambda tup: -tup[1])]
@@ -122,7 +121,7 @@ class OptimizerUtils:
         return total
 
     def get_shortest_bond(self, shelx_file):
-        return sorted([self.get_ideal_bond_length(el.capitalize(), el.capitalize(), shelx_file) for el in shelx_file.elements])[0]
+        return sorted([self.get_ideal_bond_length(el.get_name(True), el.get_name(True), shelx_file) for el in shelx_file.elements])[0]
 
     def get_specie(self, el, ox):
         """
@@ -244,7 +243,7 @@ class OptimizerUtils:
         nn_bonds_by_site = {}
 
         # print(len(shelx_file.crystal_sites))
-        for site in shelx_file.crystal_sites:
+        for site in shelx_file.get_all_sites():
             site_name = "{}{}".format(site.el_string, site.site_number)
             # print site_name
             for bond in sorted_bonds:
@@ -270,7 +269,7 @@ class OptimizerUtils:
         stoich_weighted_score = 0
         for site_name, score in site_bond_scores:
             stoich = 0
-            for site in shelx_file.crystal_sites:
+            for site in shelx_file.get_all_sites():
                 if site.get_name().capitalize() == site_name:
                     stoich = shelx_file.get_site_stoichiometry(site)
             total_stoich += stoich
@@ -380,7 +379,7 @@ class OptimizerUtils:
         ins_file.add_command("ACTA")
         ins_file.remove_command("L.S.")
         ins_file.add_command("L.S.", ["1"])
-        res = driver.run_SHELXTL(ins_file, suppress_output=False)
+        res = driver.run_SHELXTL(ins_file)
         if res is None:
             return []
 
