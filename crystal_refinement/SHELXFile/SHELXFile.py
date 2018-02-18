@@ -446,3 +446,6 @@ class SHELXFile:
 
     def get_element_by_index(self, index):
         return self.elements[index]
+
+    def copy(self):
+        return copy.deepcopy(self)

@@ -46,10 +46,10 @@ class OptimizerIteration:
             leaves.extend(child.get_leaves())
         return leaves
 
-    def get_res(self):
+    def get_res_copy(self):
         return copy.deepcopy(self.res_file)
 
-    def get_ins(self):
+    def get_ins_copy(self):
         return copy.deepcopy(self.ins_file)
 
     def generate_graph(self, output_file):

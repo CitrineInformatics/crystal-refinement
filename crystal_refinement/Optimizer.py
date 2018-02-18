@@ -108,6 +108,9 @@ class Optimizer:
 
         # Read in and run initial SHELXTL file
         ins_file = self.driver.get_ins_file()
+        if self.log_output:
+            print("Initial INS file:")
+            print(ins_file.to_string())
         ins_file.remove_command('L.S.')
         ins_file.add_command('L.S.', [str(self.least_squares_iterations)])
         self.utils = OptimizerUtils(ins_file, self.bond_lengths, self.mixing_pairs, self.use_ml_model)
