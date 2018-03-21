@@ -131,7 +131,7 @@ class Optimizer:
             self.history.clean_history(1, pre_weight_leaf)
 
         self.run_step(self.optimizer_steps.try_site_mixing)
-        self.history.clean_history()
+        self.history.clean_history(criteria=["overall_score", "r1_only"])
 
         self.driver.run_SHELXTL(self.history.get_best_history()[-1].ins_file)
         print("Done with optimization")
@@ -152,23 +152,6 @@ class Optimizer:
         for i in range(0, min(self.n_results, len(self.history.leaves))):
             with open(os.path.join(results_path, "{}.res".format(i)), 'w') as f:
                 f.write(sorted_leaves[i].res_file.filetxt)
-        # bonds = self.utils.get_bonds(self.driver, self.history.get_best_history()[-1].res_file)
-        # bond_by_atom = defaultdict(lambda: [])
-        # for bond in bonds:
-        #     bond_by_atom[bond[0]].append((bond[1], bond[2]))
-        #     bond_by_atom[bond[1]].append((bond[0], bond[2]))
-        # from citrination_client import CitrinationClient
-        # from pymatgen.core import Element
-        # for atom, bonds in bond_by_atom.items():
-        #     shortest = sorted(bonds, key=lambda tup: tup[1])[0]
-        #     print(atom, shortest)
-        #     candidate = {"Element 1": re.sub("\d", "", atom), "Element 2": re.sub("\d", "", shortest[0]), "formula": self.history.get_best_history()[-1].res_file.get_analytic_formula()}
-        #     result = CitrinationClient(os.environ["CITRINATION_API_KEY"]).predict("680", candidate)["candidates"][0]["Bond length"]
-        #     print("ml model:", shortest[1] - result[0], result)
-        #     print("sum of radii:", shortest[1] - (Element(re.sub("\d", "", atom)).atomic_radius + Element(re.sub("\d", "", shortest[0])).atomic_radius), Element(re.sub("\d", "", atom)).atomic_radius + Element(re.sub("\d", "", shortest[0])).atomic_radius)
-        #     print("#"*50)
-
-        # print(map(lambda tup: (tup[0], sorted(tup[1])[0]), bond_by_atom.items()))
 
 
     def run_step(self, step):

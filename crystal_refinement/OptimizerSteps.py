@@ -19,8 +19,10 @@ class OptimizerSteps:
         if self.optimizer.log_output:
             print("Starting with {} sites".format(initial.res_file.get_n_sites()))
         if initial.r1 > self.optimizer.r1_threshold:
-            self.reset_origin(initial)
-            # self.try_add_q(initial)dy_bond_length(leaf)
+            if initial.res_file.get_n_sites() == 1 and initial.res_file.is_small_cubic_structure():
+                self.reset_origin(initial)
+            else:
+                self.identify_sites_by_bond_length(initial)
         else:
             self.try_add_q(initial)
             for leaf in initial.get_leaves():
@@ -28,11 +30,21 @@ class OptimizerSteps:
         if self.optimizer.log_output:
             print("Finished with {} sites".format(", ".join([str(leaf.res_file.get_n_sites()) for leaf in initial.get_leaves()])))
 
-
-    # def reset_origin(self, initial):
-    #     new_ins = initial.get_res_copy()
-    #     for i in reversed(range(1, len(new_ins.get_all_sites()))):
-    #         new_ins.move_crystal_to_q(i)
+    def reset_origin(self, initial):
+        # self.identify_sites_by_bond_length(initial)
+        new_ins = initial.get_res_copy()
+        for i in reversed(range(1, new_ins.get_n_sites())):
+            new_ins.move_crystal_to_q(i)
+        for site in new_ins.get_sites_by_index(1):
+            site.position = np.asarray([0.0, 0.0, 0.0])
+            site.occupancy = 0.02083
+            site.displacement = 0.05
+        # print("about to run iter:")
+        # print(new_ins.to_string())
+        iteration = self.optimizer.history.run_iter(new_ins, initial, "Reset origin")
+        if iteration is not None:
+            self.optimizer.history.save(iteration)
+            self.try_add_q(iteration)
 
 
     def identify_sites_by_bond_length(self, initial):
@@ -42,11 +54,16 @@ class OptimizerSteps:
         """
         ins_file = initial.res_file
         shortest_possible_bond = self.optimizer.utils.get_shortest_bond(ins_file)
+        # print(shortest_possible_bond)
         prev_iteration = initial
         for i in range(5):
             new_ins = prev_iteration.get_res_copy()
+            # print("new ins:")
+            # print(new_ins.to_string())
+            # print("#"*50)
             sites_to_remove = set()
             for bond in sorted(self.optimizer.utils.get_bonds(self.optimizer.driver, new_ins), key=lambda tup: tup[2]):
+                # print(bond)
                 # Threshold on how short the bonds are
                 if bond[2] / shortest_possible_bond < 0.75:
                     a1_num = int(re.search('\d+', bond[0]).group(0))
@@ -56,6 +73,8 @@ class OptimizerSteps:
                         sites_to_remove.add(site)
             # no sites removed
             if len(sites_to_remove) == 0:
+                if i == 0:
+                    self.try_add_q(initial)
                 break
 
             for site in sites_to_remove:
@@ -74,17 +93,18 @@ class OptimizerSteps:
         Try adding q peaks to main crystal sites if it decreases R value
         :return:
         """
-        annotation = "Added q peak"
         base_ins = initial.get_res_copy()
         # This threshold could be scaled based on the potential atoms
         lightest_element = min([el.get_pymatgen_element().number for el in base_ins.elements])
         if base_ins.q_peaks[0].electron_density > lightest_element:
+            annotation = "Added q peak {}".format(base_ins.q_peaks[0].to_string())
             base_ins.move_q_to_crystal()
             # Find best element for new site
             iterations = []
             for el in base_ins.elements:
                 new_ins = base_ins.copy()
-                new_ins.get_sites_by_index(new_ins.get_n_sites()).switch_element(el)
+                for site in new_ins.get_sites_by_index(new_ins.get_n_sites()):
+                    site.switch_element(el)
                 if self.optimizer.log_output:
                     print("Trying step: {}".format(annotation))
                 iteration = self.optimizer.history.run_iter(new_ins, initial, annotation)
@@ -111,38 +131,40 @@ class OptimizerSteps:
         ins_file = initial.res_file
         r_penalty = 1.1
         bonds = self.optimizer.utils.get_bonds(self.optimizer.driver, ins_file)
-        threshold = 0.1
+        threshold = 0.05
         # print(len(ins_file.crystal_sites))
         while True:
             new_ins = initial.get_res_copy()
             sites_to_remove = set()
+            distance_ratios = []
             for a1, a2, distance in bonds:
                 ideal_distance = self.optimizer.utils.get_ideal_bond_length(a1, a2, new_ins)
+                distance_ratio = (ideal_distance - distance) / ideal_distance
+                a1_num = int(re.search('\d+', a1).group(0))
+                a2_num = int(re.search('\d+', a2).group(0))
+                index_to_remove = max(a1_num, a2_num)
+                for site in new_ins.get_sites_by_index(index_to_remove):
+                    distance_ratios.append((distance_ratio, site))
                 # if the distance is too small, remove the lower density atom
                 if (ideal_distance - distance) / ideal_distance > threshold:
-                    a1_num = int(re.search('\d+', a1).group(0))
-                    a2_num = int(re.search('\d+', a2).group(0))
-                    index_to_remove = max(a1_num, a2_num)
                     for site in new_ins.get_sites_by_index(index_to_remove):
                         sites_to_remove.add(site)
+
             # no sites removed
             if len(sites_to_remove) == 0:
                 break
+            new_ins.remove_sites(sites_to_remove)
+            # for site in sites_to_remove:
+            #     new_ins.remove_site(site)
 
-            for site in sites_to_remove:
-                new_ins.remove_site(site)
-            # ins_file.remove_sites_by_number(to_delete)
-            # ins_file.renumber_sites()
             annotation = "Removed {} site(s)".format(len(sites_to_remove))
             if self.optimizer.log_output:
                 print("Trying step: {}".format(annotation))
             cur_iter = self.optimizer.history.run_iter(new_ins, initial, annotation)
-
             if cur_iter is not None and cur_iter.r1 < initial.r1 * r_penalty:
                 self.optimizer.history.save(cur_iter)
                 break
             threshold *= 1.1
-            # quit()
 
 
     def switch_elements(self, initial):
@@ -152,6 +174,7 @@ class OptimizerSteps:
         sorted_sites = sorted(ins_file.get_all_sites(), key=lambda s: -s.displacement)
 
         for original_site in sorted_sites:
+            # print("Modifying site {}".format(original_site.site_number))
             for prev_iter in initial.get_leaves():
                 iterations = []
                 prev = original_site.get_name()
@@ -166,29 +189,21 @@ class OptimizerSteps:
                     iteration = self.optimizer.history.run_iter(new_ins, prev_iter, annotation)
 
                     if iteration is not None:
-                        iterations.append(iteration)
-                iterations.sort(key=lambda i: i.r1)
-                # print(prev)
-                for iteration in iterations:
-                    # print(iteration.ins_file.crystal_sites[i].get_name(), [site.get_name() for site in iteration.ins_file.crystal_sites], iteration.r1, iteration.bond_score, iteration.get_score())
-                    # if iteration.r1 - iterations[0].r1 < self.optimizer.r1_similarity_threshold:
-                    # print(len(iterations))
-                    # print([x.get_score() for x in iterations])
-                    if iteration.r1 - iterations[0].r1 < self.optimizer.r1_similarity_threshold or \
-                            iteration.get_score() / iterations[0].get_score() < self.optimizer.overall_score_ratio_threshold:
-                        # print("saved, score ratio: {}".format(iteration.get_score() / iterations[0].get_score()))
+                        # iterations.append(iteration)
                         self.optimizer.history.save(iteration)
+            # iterations.sort(key=lambda i: i.r1)
+            # if iteration.r1 - iterations[0].r1 < self.optimizer.r1_similarity_threshold or \
+            #         iteration.get_score() / iterations[0].get_score() < self.optimizer.overall_score_ratio_threshold:
+            #     self.optimizer.history.save(iteration)
             if original_site == sorted_sites[-1]:
-                self.optimizer.history.clean_history(branch=initial)
+                # self.optimizer.history.clean_history(branch=initial)
+                self.optimizer.history.clean_history(branch=initial, criteria=["overall_score", "r1_only"])
             else:
                 self.optimizer.history.clean_history(branch=initial, criteria="r1_only")
-            # print("#"*50)
-        # quit()
 
 
     def change_occupancy(self, initial):
         ins_file = initial.res_file
-
         # Want to make changes from largest displacement to smallest, but only in unmixed sites
         sorted_sites = sorted(ins_file.get_unmixed_sites(), key=lambda site: -site.displacement)
         displacements_list = map(lambda site: site.displacement, ins_file.get_all_sites())
@@ -208,15 +223,15 @@ class OptimizerSteps:
 
                 for site in new_ins.get_sites_by_index(original_site.site_number):
                     new_ins.add_variable_occupancy(site)
-                iteration = self.optimizer.history.run_iter(ins_file, initial, "Added variable occupancy for {}".format(original_site))
-                new_site = iteration.res_file.get_sites_by_index(original_site.site_number)[0]
+                iteration = self.optimizer.history.run_iter(new_ins, initial, "Added variable occupancy for {}".format(original_site.get_name()))
                 # If changing the occupancy decreased r1, decreased the displacement, and resulted in an occupancy
                 # that satisfies the threshold, add it to the history
-                if iteration is not None \
-                        and iteration.r1 < prev_iter.r1 \
+                if iteration is not None:
+                    new_site = iteration.res_file.get_sites_by_index(original_site.site_number)[0]
+                    if iteration.r1 < prev_iter.r1 \
                         and float(iteration.res_file.fvar_vals[-1]) < (1 - self.optimizer.occupancy_threshold) \
                         and new_site.displacement < site_displacement:
-                    self.optimizer.history.save(iteration)
+                        self.optimizer.history.save(iteration)
 
 
     def try_site_mixing(self, initial):
@@ -247,6 +262,7 @@ class OptimizerSteps:
                 self.ensure_identified_elements_are_present(initial)
             return
         for i in top_priority:
+            # print("Current site: {}, Tried: {}, other priority: {}".format(i, tried, top_priority))
             if i in tried:
                 continue
             for prev_iter in initial.get_leaves():
@@ -261,15 +277,22 @@ class OptimizerSteps:
                     iteration = self.optimizer.history.run_iter(new_ins, prev_iter, annotation)
 
                     if iteration is not None:
-                        if prev_iter.r1 - iteration.r1 < self.optimizer.r1_similarity_threshold:
+                        if iteration.r1 - prev_iter.r1 < self.optimizer.r1_similarity_threshold:
+                            self.optimizer.history.save(iteration)
+                            if prev_iter.r1 - iteration.r1 < self.optimizer.r1_similarity_threshold:
+                                prev_iter.propagate()
                             new_ins = iteration.get_res_copy()
                             new_ins.add_site_mixing_variable_occupancy(i)
                             annotation = "Adding variable occupancy for {} and {} on site {}".format(pair[0].get_name(), pair[1].get_name(), i)
                             if self.optimizer.log_output:
                                 print("Trying step: {}".format(annotation))
                             variable_occupancy_iteration = self.optimizer.history.run_iter(new_ins, iteration, annotation)
+                            # print "variable_occupancy_iteration"
+                            # print variable_occupancy_iteration
+                            # print(new_ins.to_string())
                             if variable_occupancy_iteration is not None:
                                 occupancy_var = float(variable_occupancy_iteration.get_res_copy().fvar_vals[-1])
+                                # print(occupancy_var)
                                 # Only include occupancies that are actually split
                                 if occupancy_var > self.optimizer.occupancy_threshold and occupancy_var < (1 - self.optimizer.occupancy_threshold):
                                     iterations.append(variable_occupancy_iteration)
@@ -278,11 +301,12 @@ class OptimizerSteps:
                     continue
                 iterations.sort(key=lambda i: i.r1)
                 best_r1 = min([prev_iter.r1, iterations[0].r1])
-                if prev_iter.r1 - best_r1 < self.optimizer.r1_similarity_threshold:
-                    prev_iter.propagate()
+                # if prev_iter.r1 - best_r1 < self.optimizer.r1_similarity_threshold:
+                #     prev_iter.propagate()
                 if iterations[0].r1 - best_r1 < self.optimizer.r1_similarity_threshold:
                     self.optimizer.history.save(iterations[0])
-        self.optimizer.history.clean_history(branch=initial)
+        # self.optimizer.history.clean_history(branch=initial)
+        self.optimizer.history.clean_history(branch=initial, criteria=["overall_score", "r1_only"])
         if self.optimizer.log_output:
             print("Cleared branch history for {} site path".format(len(ins_file.get_all_sites())))
         for leaf in initial.get_leaves():

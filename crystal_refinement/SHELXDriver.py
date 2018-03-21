@@ -69,14 +69,14 @@ class SHELXDriver:
         if not self.has_valid_res_file():
             return None
 
-        if "**" in output:
-            matches = re.findall("\*\*[^(*|\n)]+\*\*", output)
-            # use a regex, you don't want to throw this out if "any" matches
-            if not all(x in recognized_errors for x in matches):
-                print("Unrecognized error in refinement output:")
-                print(output)
-                print("INS file:")
-                print(ins_file_obj.to_string())
+        # if "**" in output:
+        #     matches = re.findall("\*\*[^(*|\n)]+\*\*", output)
+        #     # use a regex, you don't want to throw this out if "any" matches
+        #     if not all(x in recognized_errors for x in matches):
+        #         print("Unrecognized error in refinement output:")
+        #         print(output)
+        #         print("INS file:")
+        #         print(ins_file_obj.to_string())
 
         return self.get_res_file()
 

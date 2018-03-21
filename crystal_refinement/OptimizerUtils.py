@@ -1,5 +1,5 @@
 from pymatgen.structure_prediction.substitution_probability import SubstitutionProbability
-from pymatgen import Element
+from pymatgen import Element, Composition
 import re, copy, itertools, os
 from collections import defaultdict
 from pymatgen.io.cif import CifParser
@@ -26,10 +26,7 @@ class OptimizerUtils:
             self.prediction_cache = {}
         else:
             self.ml_model = None
-        if bond_lengths is None:
-            self.bond_lengths = dict()
-        else:
-            self.bond_lengths = {self.get_bond_key(el1, el2): bond_length for el1, el2, bond_length in bond_lengths}
+        self.bond_lengths = {}
 
         for el1 in self.element_list:
             for el2 in self.element_list:
@@ -37,6 +34,9 @@ class OptimizerUtils:
                 if bond_key not in self.bond_lengths.keys():
                     self.bond_lengths[bond_key] = self.get_bond_length(el1, el2, shelx_file)
 
+        if bond_lengths is not None:
+            for el1, el2, bond_length in bond_lengths:
+                self.bond_lengths[self.get_bond_key(el1, el2)] = bond_length
 
         if mixing_pairs is None:
             self.mixing_pairs = self.get_mixing_pairs(shelx_file, probability_threshold=2E-4)
@@ -56,10 +56,14 @@ class OptimizerUtils:
         if prediction_key in self.prediction_cache:
             return self.prediction_cache[prediction_key][0]
         try:
-            candidate = {"Element 1": el1, "Element 2": el2, "formula": formula}
-            result = self.ml_model.predict("680", candidate)["candidates"][0]["Bond length"]
-            if result[1] < 0.5:
-                self.prediction_cache[prediction_key] = result
+            candidate = [{"Element 1": el1, "Element 2": el2, "formula": formula},
+                         {"Element 1": el2, "Element 2": el1, "formula": formula}]
+
+            results = [x["Bond length"] for x in self.ml_model.predict("680", candidate)["candidates"]]
+            uncertainty = (results[0][1] + results[1][1]) / 2
+            if uncertainty < 0.5:
+                bond_length_prediction = (results[0][0] + results[1][0]) / 2
+                self.prediction_cache[prediction_key] = [bond_length_prediction, uncertainty]
                 return self.prediction_cache[prediction_key][0]
         except Exception:
             pass
@@ -70,25 +74,28 @@ class OptimizerUtils:
     def get_report(self):
         report = ""
         report += "Mixing pairs considered: {}\n\n".format(", ".join(["({}, {})".format(e1.get_name(), e2.get_name()) for e1, e2 in self.mixing_pairs]))
-        for elements, bond_length in self.bond_lengths.items():
-            report += "User defined bond lengths:\n"
-            report += "Bond: {}-{}, length: {:.3f} ang\n".format(elements[0], elements[1], bond_length)
+        # for elements, bond_length in self.bond_lengths.items():
+        #     report += "User defined bond lengths:\n"
+        #     report += "Bond: {}-{}, length: {:.3f} ang\n".format(elements[0], elements[1], bond_length)
         if self.ml_model is None:
             report += "Bond lengths as calculated based on atomic radii:\n"
-            for i in range(len(self.element_list)):
-                for j in range(i, len(self.element_list)):
-                    el1 = self.element_list[i]
-                    el2 = self.element_list[j]
-                    report += "Bond: {}-{}, length: {:.3f} ang\n".format(el1, el2, Element(el1).atomic_radius + Element(el2).atomic_radius)
+
+            # for i in range(len(self.element_list)):
+            #     for j in range(i, len(self.element_list)):
+            #         el1 = self.element_list[i]
+            #         el2 = self.element_list[j]
+            #         report += "Bond: {}-{}, length: {:.3f} ang\n".format(el1, el2, Element(el1).atomic_radius + Element(el2).atomic_radius)
 
         else:
             report += "Bond lengths as predicted by Citrination machine learning model:\n"
-            for k, v in sorted(self.prediction_cache.items()):
-                report += "Bond: {}, length: {:.3f} ang, formula: {}".format(k[0], v[0], k[1])
-                if v[1] == 0.0:
-                    report += ", Note: This bond length based on atomic radii due to high machine learning model uncertainty\n"
-                else:
-                    report += "\n"
+        for bond_key, bond_length in sorted(self.bond_lengths.items(), key=lambda tup: tup[1]):
+            report += "Bond: {}, length: {:.3f} ang\n".format(bond_key, bond_length)
+            # for k, v in sorted(self.prediction_cache.items()):
+            #     report += "Bond: {}, length: {:.3f} ang, formula: {}".format(k[0], v[0], k[1])
+            #     if v[1] == 0.0:
+            #         report += ", Note: This bond length based on atomic radii due to high machine learning model uncertainty\n"
+            #     else:
+            #         report += "\n"
         report += "\n"
         return report
 
@@ -99,10 +106,8 @@ class OptimizerUtils:
         # If substitution probability is > probability_threshold, then save it to pairs list.
         for e1, e2 in itertools.combinations(shelx_file.elements, 2):
             sp = self.get_substitution_probability(e1.get_pymatgen_element(), e2.get_pymatgen_element())
-            # print(e1, e2, sp)
             if sp > probability_threshold:
                 pairs.append(([e1, e2], sp))
-
         # Sort pairs by substitution probability (largest to smallest)
         return [tup[0] for tup in sorted(pairs, key=lambda tup: -tup[1])]
 
@@ -185,7 +190,7 @@ class OptimizerUtils:
         # Calculate amount which bonds deviate from the expected bond length
         return -((bond[2] - ideal_bond_length) / 2) ** 2
 
-    def get_bond_score_relative_distance(self, bond, all_nn_bonds):
+    def get_bond_score_relative_distance(self, bond, all_nn_bonds, verbose=False):
         """
         :param bond: The bond (el1, el2, length)
         :param all_nn_bonds: All nearest neighbor bonds in the compound
@@ -193,7 +198,8 @@ class OptimizerUtils:
         :return: bond score. Lower is better. For bonds that are ordered differently than ideal, the score will be
         appended with the difference between the bond lengths (some notion of how "wrong" it is).
         """
-
+        if verbose:
+            print("calculating bond score for {}".format(bond))
         score = 0.0
         ideal_bond_length = self.bond_lengths[self.get_bond_key(self.specie_to_el(bond[0]), self.specie_to_el(bond[1]))]
         for other_bond in all_nn_bonds:
@@ -202,17 +208,19 @@ class OptimizerUtils:
             actual_comp = bond[2] < other_bond[2]
             if ideal_comp != actual_comp or ideal_bond_length == other_ideal_bond_length:
                 diff = abs(bond[2] - other_bond[2])
+                ideal_diff = abs(ideal_bond_length - other_ideal_bond_length)
                 if ideal_bond_length == other_ideal_bond_length:
-                    bond_score = pow(max(diff - 0.1, 0.0), 2)
+                    bond_score = (pow(max(diff - 0.1, 0.0), 2) + pow(max(ideal_diff - 0.1, 0.0), 2)) / 2
                 else:
-                    bond_score = pow(diff, 2)
-                # if bond_score > 0.0:
-                #     print("Bond added to score: {}, {}, {}, {}".format(diff, bond_score, bond, other_bond))
+                    bond_score = (pow(diff, 2) + pow(ideal_diff, 2)) / 2
+                if verbose and bond_score > 0.0:
+                    print("Bond added to score: {}, {}, {}, {}".format(diff, bond_score, bond, other_bond))
                 score += bond_score
-
+        if verbose:
+            print("final score for {} is {}".format(bond, score))
         return score
 
-    def get_site_bond_scores_relative_distance(self, bonds, all_nn_bonds, n_bonds=4):
+    def get_site_bond_scores_relative_distance(self, bonds, all_nn_bonds, n_bonds=4, verbose=False):
         """
         Determines priority for adding in site mixing.  Finds most problematic sites based on whether bonds
         are shorter than expected.
@@ -222,22 +230,19 @@ class OptimizerUtils:
         """
         bond_by_atom = defaultdict(lambda: [])
         for bond in bonds:
-            bond_score = self.get_bond_score_relative_distance(bond, all_nn_bonds)
+            bond_score = self.get_bond_score_relative_distance(bond, all_nn_bonds, verbose=verbose)
             bond_by_atom[bond[0]].append(bond_score)
             bond_by_atom[bond[1]].append(bond_score)
         # Average over scores from n shortest bonds
         res = map(lambda tup: (tup[0], sum(sorted(tup[1])[:n_bonds])), bond_by_atom.items())
+        if verbose:
+            print("scores after filtering to shortest bonds:")
+            for bond in res:
+                print(bond)
         # Sort by which bonds are the shortest compared to what we'd expect
         return sorted(res, key=lambda tup: tup[1])
 
-    def score_compound_bonds_relative_distance(self, bonds, shelx_file, driver):
-        """
-        The smaller the better
-        :param bonds:
-        :param ml_model:
-        :return:
-        """
-
+    def get_nn_bonds_by_site(self, bonds, shelx_file):
         sorted_bonds = sorted(bonds, key=lambda tup: tup[2])
 
         nn_bonds_by_site = {}
@@ -251,6 +256,17 @@ class OptimizerUtils:
                     nn_bonds_by_site[site_name] = bond
                     # print(bond)
                     break
+        return nn_bonds_by_site
+
+    def score_compound_bonds_relative_distance(self, bonds, shelx_file, driver, verbose=False):
+        """
+        The smaller the better
+        :param bonds:
+        :param ml_model:
+        :return:
+        """
+
+        nn_bonds_by_site = self.get_nn_bonds_by_site(bonds, shelx_file)
 
 
         # for bond in bonds:
@@ -263,11 +279,18 @@ class OptimizerUtils:
         #     print(site, bond)
         # quit()
 
+        if verbose:
+            print("bonds by site:")
+            for bond in nn_bonds_by_site.items():
+                print(bond)
 
-        site_bond_scores = self.get_site_bond_scores_relative_distance(nn_bonds_by_site.values(), nn_bonds_by_site.values(), n_bonds=1)
+        site_bond_scores = self.get_site_bond_scores_relative_distance(nn_bonds_by_site.values(), nn_bonds_by_site.values(), n_bonds=1, verbose=verbose)
         total_stoich = 0
         stoich_weighted_score = 0
+
         for site_name, score in site_bond_scores:
+            if verbose:
+                print(site_name, score)
             stoich = 0
             for site in shelx_file.get_all_sites():
                 if site.get_name().capitalize() == site_name:
@@ -384,8 +407,29 @@ class OptimizerUtils:
             return []
 
         with open(driver.cif_file) as f:
-            cif_file = CifParser.from_string(f.read())
+            file_txt = f.read()
+            cif_file = CifParser.from_string(file_txt)
 
         cif_dict = cif_file.as_dict().values()[0]
         return zip(cif_dict["_geom_bond_atom_site_label_1"], cif_dict["_geom_bond_atom_site_label_2"],
                    [float(x.replace("(", "").replace(")", "")) for x in cif_dict["_geom_bond_distance"]])
+
+    def get_n_missing_elements(self, shelx_file):
+        nominal_elements = set(map(lambda el: el.get_name(), shelx_file.elements))
+        result_elements = map(lambda site: site.el_string, shelx_file.get_all_sites())
+        return len(nominal_elements.difference(result_elements))
+
+    def get_stoichiometry_score(self, shelx_file):
+        nominal_elements = set(map(lambda el: el.get_name(capitalize=True), shelx_file.elements))
+        nominal_formula = Composition(shelx_file.get_nominal_formula())
+        try:
+            analytic_formula = Composition(shelx_file.get_analytic_formula())
+        except:
+            print(shelx_file.get_analytic_formula())
+            quit()
+        score = 0.0
+        for el in nominal_elements:
+            diff = abs(nominal_formula.get_atomic_fraction(el) - analytic_formula.get_atomic_fraction(el))
+            if diff > 0.05:
+                score += diff
+        return score

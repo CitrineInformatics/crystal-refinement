@@ -228,7 +228,7 @@ class SHELXFile:
         Move the top q peak to a crystal site
         """
         crystal_site = self.q_peaks[0]
-        crystal_site.site_number = int(self.get_n_sites())
+        crystal_site.site_number = int(self.get_n_sites()) + 1
         self.add_site(crystal_site)
         self.q_peaks.remove(crystal_site)
 
@@ -317,13 +317,18 @@ class SHELXFile:
         # print(site_indices)
         # for site in self.crystal_sites:
         #     print(site.get_name())
+
         # If site occupancy is not already variable, add a term to fvar:
         if sites[0].occupancy_prefix == 1:
             self.fvar_vals.append(0.5)
             sites[0].occupancy_prefix = len(self.fvar_vals)
+            sites[0].occupancy *= 2
             sites[1].occupancy_prefix = -len(self.fvar_vals)
+            sites[1].occupancy *= 2
         else:
-            sites[1].occupancy_prefix = -len(sites[0].occupancy_prefix)
+            sites[1].occupancy_prefix = -sites[0].occupancy_prefix
+            sites[0].occupancy *= 2
+            sites[1].occupancy *= 2
 
     # def add_site_mixing(self, site_number, mixing_element_indices):
     #     """
@@ -386,27 +391,15 @@ class SHELXFile:
             if len(self._crystal_sites_by_index[index]) > 1:
                 self._mixed_site_indices.append(index)
 
-    # def reindex_sites_test(self):
-    #     """
-    #     Repopulates the crystal site and mixed site indices. Also renumbers the sites to consecutive integers.
-    #     :return:
-    #     """
-    #     self._crystal_sites_by_index = {}
-    #     groups = []
-    #     for index, group in groupby(self._crystal_sites, key=lambda site: site.site_number):
-    #         groups.append((index, list(group)))
-    #
-    #     for index, (_, sites) in enumerate(sorted(groups, key=lambda group: group[0])):
-    #         site_list = []
-    #         for site in list(sites):
-    #             site.site_number = index + 1
-    #             site_list.append(site)
-    #         self._crystal_sites_by_index[index + 1] = site_list
-    #
-    #     self._mixed_site_indices = []
-    #     for index in self._crystal_sites_by_index.keys():
-    #         if len(self._crystal_sites_by_index[index]) > 1:
-    #             self._mixed_site_indices.append(index)
+    def is_small_cubic_structure(self):
+        cubic_space_groups = ["P23", "F23", "I23", "P2(1)3", "I2(1)3", "Pm-3", "Pn-3", "Fm-3", "Fd-3", "Im-3",
+                              "Pa-3", "Ia-3", "P432", "P4(2)32", "F432", "F4(1)32", "I432", "P4(3)32", "P4(1)32",
+                              "I4(1)32", "P-43m", "F4-3m", "I-43m", "P-43n", "F-43c", "I-43d", "Pm-3m", "Pn-3n",
+                              "Pm-3n", "Pn-3m", "Fm-3m", "Fm-3c", "Fd-3m", "Fd-3c", "Im-3m", "Ia-3d"]
+        split = self.extra_text[0].split("\n")
+        space_group = split[0].split()[-1]
+        cell_size = split[1].split()[2:5]
+        return space_group in cubic_space_groups and all([float(x) < 5.0 for x in cell_size])
 
     def add_site(self, new_site):
         self._crystal_sites.append(new_site)
@@ -414,6 +407,11 @@ class SHELXFile:
 
     def remove_site(self, site_to_remove):
         self._crystal_sites.remove(site_to_remove)
+        self._reindex_sites()
+
+    def remove_sites(self, sites_to_remove):
+        for site in sites_to_remove:
+            self._crystal_sites.remove(site)
         self._reindex_sites()
 
     def crystal_sites_string(self):

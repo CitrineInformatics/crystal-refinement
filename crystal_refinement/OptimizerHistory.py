@@ -1,24 +1,27 @@
 import copy, random, math
 from graphviz import Digraph
-import numpy as np
+from collections import OrderedDict
+from itertools import chain
 
 
 class OptimizerIteration:
     """
     Define class to hold information on one optimizer iteration
     """
-    def __init__(self, parent, ins_file, res_file, bond_score, score_weighting=1.0, annotation=None):
+    def __init__(self, parent, ins_file, res_file, bond_score, n_missing_elements, stoich_score, score_weighting=1.0, annotation=None):
         self.ins_file = copy.deepcopy(ins_file)
         self.res_file = copy.deepcopy(res_file)
         self.r1 = res_file.r1
         self.bond_score = bond_score
         # the higher this is, the more the r1 counts. Must be between 0 and 1
         self.score_weighting = score_weighting
-        # self.overall_score = self.r1 * self.bond_score
+
         self.parent = parent
         self.dead_branch = False
         self.children = []
         self.annotation = annotation
+        self.n_missing_elements = n_missing_elements
+        self.stoich_score = stoich_score
 
     def add_child(self, child):
         self.children.append(child)
@@ -79,10 +82,10 @@ class OptimizerIteration:
         if self.dead_branch:
             color = "red"
         if len(self.children) == 0 and rank >= 0:
-            dot.node(node_label, "r1: {}\nbond: {}\noverall:{}\n rank:{}"
-                     .format(self.r1, self.bond_score, self.get_score(), rank + 1), color=color)
+            dot.node(node_label, "r1: {}\nbond: {}\nmissing_elements: {}\noverall:{}\nrank:{}"
+                     .format(self.r1, self.bond_score, self.n_missing_elements, self.get_score(), rank + 1), color=color)
         else:
-            dot.node(node_label, "r1: {}\nbond: {}\noverall:{}".format(self.r1, self.bond_score, self.get_score()),
+            dot.node(node_label, "r1: {}\nbond: {}\nmissing_elements: {}\noverall:{}".format(self.r1, self.bond_score, self.n_missing_elements, self.get_score()),
                      color=color)
         dot.edge(parent_label, node_label, color=color, label=self.annotation)
 
@@ -92,7 +95,7 @@ class OptimizerIteration:
     def generate_truncated_graph(self, output_file):
         dot = Digraph()
         node_label = str(random.getrandbits(32))
-        dot.node(node_label, "r1: {}\nbond: {}\noverall:{}".format(self.r1, self.bond_score, self.get_score()), color="green")
+        dot.node(node_label, "r1: {}\nbond: {}\nmissing_elements: {}\noverall:{}".format(self.r1, self.bond_score, self.n_missing_elements, self.get_score()), color="green")
         sorted_leaves = self.get_sorted_leaves()
         self._generate_truncated_graph(node_label, dot, sorted_leaves)
         dot.render(output_file, view=False)
@@ -113,15 +116,15 @@ class OptimizerIteration:
             if len(child.children) == 0:
                 try:
                     rank = sorted_leaves.index(child)
-                    dot.node(child_label, "r1: {}\nbond: {}\noverall:{}\n rank:{}"
-                             .format(child.r1, child.bond_score, child.get_score(), rank + 1),
+                    dot.node(child_label, "r1: {}\nbond: {}\nmissing_elements: {}\noverall:{}\nrank:{}"
+                     .format(self.r1, self.bond_score, self.n_missing_elements, self.get_score(), rank + 1),
                              color=color)
                 except ValueError:
                     dot.node(child_label,
-                             "r1: {}\nbond: {}\noverall:{}".format(child.r1, child.bond_score, child.get_score()),
+                             "r1: {}\nbond: {}\nmissing_elements: {}\noverall:{}".format(self.r1, self.bond_score, self.n_missing_elements, self.get_score()),
                              color=color)
             else:
-                dot.node(child_label, "r1: {}\nbond: {}\noverall:{}".format(child.r1, child.bond_score, child.get_score()),
+                dot.node(child_label, "r1: {}\nbond: {}\nmissing_elements: {}\noverall:{}".format(self.r1, self.bond_score, self.n_missing_elements, self.get_score()),
                          color=color)
             dot.edge(node_label, child_label, color=color, label=child.annotation)
 
@@ -163,27 +166,55 @@ class OptimizerIteration:
         new_annotation = None
         if self.annotation is not None:
             new_annotation = "Propagated from previous generation"
-        new_child = OptimizerIteration(self, self.get_ins(), self.get_res(), self.bond_score, self.score_weighting,
+        new_child = OptimizerIteration(self, self.get_ins_copy(), self.get_res_copy(), self.bond_score, self.n_missing_elements, self.stoich_score, self.score_weighting,
         new_annotation)
         self.children.append(new_child)
 
-    def get_score(self):
-        bond_score_basis = 0.1
-        # return math.pow(self.r1, self.score_weighting) + math.pow(self.bond_score, 1 - self.score_weighting)
-        # return (1.0 + math.pow(self.r1 / r1_basis, self.score_weighting)) \
-        #        * (1.0 + math.pow(self.bond_score / bond_score_basis, 1 - self.score_weighting))
-        return math.pow(self.r1, self.score_weighting) * math.pow(self.bond_score + bond_score_basis, 1 - self.score_weighting)
-        # return self.r1 * self.bond_score
-        # return (self.r1, len(self.res_file.mixed_site_numbers))
+    def get_score(self, criterion="overall_score"):
+        assert criterion in ["overall_score", "r1_only", "bond_only", "missing_elements"], "{} is not a supported criterion".format(
+            criterion)
+        if criterion == "overall_score":
+            bond_score_basis = 0.1
+            missing_elements_basis = 0.05
+            stoich_score_basis = 0.1
+            # return math.pow(self.r1, self.score_weighting) + math.pow(self.bond_score, 1 - self.score_weighting)
+            # return (1.0 + math.pow(self.r1 / r1_basis, self.score_weighting)) \
+            #        * (1.0 + math.pow(self.bond_score / bond_score_basis, 1 - self.score_weighting))
+            # try:
+            return math.pow(self.r1, self.score_weighting) * \
+                   math.pow(self.bond_score + bond_score_basis, 1 - self.score_weighting) + \
+                   missing_elements_basis * self.n_missing_elements ** 2 + \
+                   stoich_score_basis * self.stoich_score
+            # except TypeError:
+            #     print(self.r1, self.score_weighting, self.bond_score, self.n_missing_elements)
+            #     quit()
+            # return self.r1 * self.bond_score
+            # return (self.r1, len(self.res_file.mixed_site_numbers))
+        if criterion == "r1_only":
+            return self.r1
+        if criterion == "bond_only":
+            return self.bond_score
+        if criterion == "missing_elements":
+            return self.n_missing_elements
+        if criterion == "stoich_only":
+            return self.stoich_score
 
     def get_sorted_leaves(self, criteria="overall_score"):
-        assert criteria in ["overall_score", "r1_only", "bond_only"], "{} is not a supported criteria".format(criteria)
-        if criteria == "overall_score":
-            return sorted(self.get_leaves(), key=lambda iteration: iteration.get_score())
-        if criteria == "r1_only":
-            return sorted(self.get_leaves(), key=lambda iteration: iteration.r1)
-        if criteria == "bond_only":
-            return sorted(self.get_leaves(), key=lambda iteration: iteration.bond_score)
+        if type(criteria) != list:
+            criteria = [criteria]
+
+        sorted_by_criteria = []
+
+        for criterion in criteria:
+            sorted_by_criteria.append(sorted(self.get_leaves(), key=lambda iteration: iteration.get_score(criterion)))
+
+        # interleave sorted lists
+        sorted_leaves_with_duplicates = list(chain(*zip(*sorted_by_criteria)))
+
+        # deduplicate interleaved list
+        deduplicated = list(OrderedDict.fromkeys(sorted_leaves_with_duplicates))
+
+        return deduplicated
 
     def get_best(self):
         return self.get_sorted_leaves()[0]
@@ -200,7 +231,7 @@ class OptimizerHistory:
         res = self.driver.run_SHELXTL(ins_file)
         bonds = self.utils.get_bonds(self.driver, res)
         self.head = OptimizerIteration(None, ins_file, res, self.utils.score_compound_bonds_relative_distance(bonds, ins_file, self.driver),
-                                       score_weighting=self.score_weighting)
+                                       self.utils.get_n_missing_elements(res), self.utils.get_stoichiometry_score(res), score_weighting=self.score_weighting)
 
         self.leaves = [self.head]
         self.max_n_leaves = max_n_leaves
@@ -221,12 +252,16 @@ class OptimizerHistory:
             if len(bonds) == 0:
                 return None
 
+            new_iter = OptimizerIteration(parent_iteration, ins_file, res,
+                                          self.utils.score_compound_bonds_relative_distance(bonds, res, self.driver),
+                                          self.utils.get_n_missing_elements(res),
+                                          self.utils.get_stoichiometry_score(res), score_weighting=self.score_weighting,
+                                          annotation=annotation)
         # This throws a FileNotFound error in python3, let's just try catching everything for now...
         # except (IndexError, ZeroDivisionError):
         except:
             return None
-        new_iter = OptimizerIteration(parent_iteration, ins_file, res, self.utils.score_compound_bonds_relative_distance(bonds, res, self.driver),
-                                      score_weighting=self.score_weighting, annotation=annotation)
+
         return new_iter
 
     def clean_history(self, n_to_keep=None, branch=None, criteria="overall_score"):
