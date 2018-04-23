@@ -1,10 +1,13 @@
+import copy
+
 from crystal_refinement.Optimizer import Optimizer
-from crystal_refinement.SHELXDriver import SHELXDriver
+from crystal_refinement.SHELX.SHELXDriver import SHELXDriver
 
 # input_prefix="input"
 # path_to_ins="/Users/eantono/Documents/src/xtal_refinement/examples"
-input_prefix="test"
-path_to_ins="/Users/eantono/Documents/project_files/xtal_refinement/Organized_data1/MIXING/KZnSiAs_mar1174/INS-HKL"
+input_prefix="temp"
+# path_to_ins="/Users/eantono/Documents/project_files/xtal_refinement/testing_021618_A/mixing"
+path_to_ins="/Users/eantono/Documents/project_files/xtal_refinement/testing_021618_A/bond length ml"
 # output_prefix="output"
 path_to_xl="/Users/eantono/Documents/program_files/xtal_refinement/SXTL/xl.exe"
 path_to_xs="/Users/eantono/Documents/program_files/xtal_refinement/SXTL/xs.exe"
@@ -12,6 +15,14 @@ path_to_xs="/Users/eantono/Documents/program_files/xtal_refinement/SXTL/xs.exe"
 
 driver = SHELXDriver(ins_path=path_to_ins, prefix=input_prefix, path_to_xl=path_to_xl, path_to_xs=path_to_xs,
                      use_wine=True, suppress_ouput=True)
+
+
+ins_file = copy.deepcopy(driver.get_ins_file())
+ins_file.add_command("ACTA")
+ins_file.remove_command("L.S.")
+ins_file.add_command("L.S.", ["1"])
+res = driver.run_SHELXTL(ins_file)
+quit()
 
 # copy 1.ins to test.ins
 # driver.run_SHELXTL_command("xs")

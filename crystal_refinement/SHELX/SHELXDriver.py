@@ -1,8 +1,7 @@
 import os
-import re
 import subprocess
 
-from crystal_refinement.SHELXFile.SHELXFile import SHELXFile
+from crystal_refinement.SHELX.SHELXFile import SHELXFile
 
 
 class SHELXDriver:
@@ -69,6 +68,7 @@ class SHELXDriver:
         if not self.has_valid_res_file():
             return None
 
+        # This currently spams the output too much
         # if "**" in output:
         #     matches = re.findall("\*\*[^(*|\n)]+\*\*", output)
         #     # use a regex, you don't want to throw this out if "any" matches

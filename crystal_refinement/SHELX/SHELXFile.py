@@ -2,10 +2,10 @@ import copy
 import re
 
 from itertools import groupby
-from crystal_refinement.SHELXFile.SHELXElement import SHELXElement
+from crystal_refinement.SHELX.SHELXElement import SHELXElement
 from pymatgen import Composition
 
-from crystal_refinement.SHELXFile.CrystalSite import CrystalSite
+from crystal_refinement.SHELX.CrystalSite import CrystalSite
 
 
 class SHELXFile:
@@ -20,9 +20,7 @@ class SHELXFile:
         self.extra_text_section = 0
 
         self.elements = []
-        # self.elements = []
         self._el_by_name = {}
-        # self.formula_units = []
 
         # Stores commands as dict.  If command has no value, value is set to None
         self.commands = []
@@ -32,9 +30,6 @@ class SHELXFile:
         self._crystal_sites = []
         self._mixed_site_indices = []
         self._crystal_sites_by_index = {}
-
-        # self.crystal_sites = []
-        # self.mixed_site_numbers = []
         self.q_peaks = []
 
         self.r1 = 0.0
@@ -49,7 +44,6 @@ class SHELXFile:
         """
         lines = filetxt.split("\n")
         line_idx = 0
-        # print filetxt
 
         # First text section, break at SFAC line
         while True:
@@ -67,8 +61,6 @@ class SHELXFile:
             shelx_el = SHELXElement(element, stoichiometry, i + 1) # SHELX convention 1-indexes elements
             self.elements.append(shelx_el)
             self._el_by_name[element] = shelx_el
-        # self.elements = lines[line_idx].split()[1:]
-        # self.formula_units = lines[line_idx + 1].split()[1:]
 
         line_idx += 2
 
@@ -213,16 +205,6 @@ class SHELXFile:
             formula += "{}{}".format(el, stoich)
         return Composition(formula).alphabetical_formula
 
-    # def change_element(self, site_index, element_index):
-    #     """
-    #     Changes the element at a given site
-    #     :param site_index: Index (starting at 0) of site
-    #     :param element_index: Index (starting at 1) of element
-    #     """
-    #     site = self.crystal_sites_list.get_site_by_index(site_index)[0]
-    #     site.element = element_index
-    #     site.el_string = self.elements[element_index - 1]
-
     def move_q_to_crystal(self):
         """
         Move the top q peak to a crystal site
@@ -245,28 +227,6 @@ class SHELXFile:
         for site in sites:
             self.q_peaks.insert(0, site)
             self.remove_site(site)
-
-    # def remove_sites_by_number(self, site_numbers):
-    #     """
-    #     Remove several crystal sites at once
-    #     :param site_numbers: List of site numbers to remove
-    #     :return:
-    #     """
-    #     self.crystal_sites = [site for site in self.crystal_sites if site.site_number not in site_numbers]
-
-    # def renumber_sites(self):
-    #     """
-    #     Renumbers the sites to consecutive integers
-    #     :return:
-    #     """
-    #     renumbered = 0
-    #     cur_site_number = None
-    #     for site in self.crystal_sites:
-    #         # Indexed from 1, so the first iteration will trigger this
-    #         if cur_site_number != site.site_number:
-    #             cur_site_number = site.site_number
-    #             renumbered += 1
-    #         site.site_number = renumbered
 
     def add_variable_occupancy(self, site):
         """
@@ -309,14 +269,7 @@ class SHELXFile:
         :return:
         """
         sites = self.get_sites_by_index(site_index)
-        # print(self.to_string())
-        # for site in self.get_all_sites():
-        #     print(site.to_string())
-        # print(self._crystal_sites_by_index)
         assert len(sites) > 1, "Site {} must be mixed".format(site_index)
-        # print(site_indices)
-        # for site in self.crystal_sites:
-        #     print(site.get_name())
 
         # If site occupancy is not already variable, add a term to fvar:
         if sites[0].occupancy_prefix == 1:
@@ -329,48 +282,6 @@ class SHELXFile:
             sites[1].occupancy_prefix = -sites[0].occupancy_prefix
             sites[0].occupancy *= 2
             sites[1].occupancy *= 2
-
-    # def add_site_mixing(self, site_number, mixing_element_indices):
-    #     """
-    #     Adds multiple occupancy of a given crystal site.  Right now, only handles 2-element site mixing.
-    #     :param site_number: Crystal site index
-    #     :param mixing_element_indices: Indices of elements mixed at that site
-    #     :return:
-    #     """
-    #     assert len(mixing_element_indices) <= 2, "Error: Can only handle mixing between 2 elements"
-    #     site_indices = self.get_crystal_sites_by_number(site_number)
-    #     self.commands.append(("EXYZ", [self.elements[i] + str(site_number) for i in mixing_element_indices]))
-    #     self.commands.append(("EADP", [self.elements[i] + str(site_number) for i in mixing_element_indices]))
-    #
-    #     # If site occupancy is not already variable, add a term to fvar:
-    #     if self.crystal_sites[site_indices[0]].occupancy_prefix == 1:
-    #         self.fvar_vals.append(0.5)
-    #
-    #     mixed_sites = []
-    #     for i, element_idx in enumerate(mixing_element_indices):
-    #         new_site = copy.deepcopy(self.crystal_sites[site_indices[0]])
-    #         new_site.el_string = self.elements[element_idx]
-    #         new_site.site_number = str(site_number)
-    #         new_site.element = element_idx + 1  # Because elements are 1-indexed
-    #         if i == 0:
-    #             new_site.occupancy_prefix = len(self.fvar_vals)
-    #         else:
-    #             new_site.occupancy_prefix = -len(self.fvar_vals)
-    #         mixed_sites.append(new_site)
-    #
-    #     self.remove_sites_by_number([site_number])  # Remove original crystal site
-    #     self.crystal_sites.extend(mixed_sites)  # Replace with new mixed sites
-    #     self.crystal_sites.sort(key=lambda site: site.site_number)
-    #     self.mixed_site_numbers.append(site_number)
-
-    # def get_crystal_sites_by_number(self, index):
-    #     """
-    #     Returns the index in the crystal_site list corresponding to site_number=number
-    #     In case of mixed sites, this list could have length > 1
-    #     :param number: number of site we're looking for
-    #     :return:
-    #     """
-    #     return self.crystal_sites_list.get_site_by_index(index)
 
     def _reindex_sites(self):
         """

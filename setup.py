@@ -7,6 +7,6 @@ setup(
     url='citrine.io',
     license='BSD License',
     author='jling, eantono',
-    author_email='jling (at) citrine (dot) io',
+    author_email='erin (at) citrine (dot) io',
     description='Helps automate shelx for single crystal refinement'
 )

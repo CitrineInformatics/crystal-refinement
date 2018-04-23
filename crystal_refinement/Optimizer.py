@@ -1,10 +1,10 @@
-from SHELXDriver import SHELXDriver
-import os, re, time
+import os
 import shutil
-from OptimizerHistory import OptimizerHistory
-from OptimizerSteps import OptimizerSteps
-from OptimizerUtils import OptimizerUtils
-from collections import defaultdict
+
+from OptimizerSteps import *
+from crystal_refinement.SHELX.SHELXDriver import SHELXDriver
+from crystal_refinement.history.OptimizerHistory import OptimizerHistory
+from crystal_refinement.utils.OptimizerUtils import OptimizerUtils
 
 
 class Optimizer:
@@ -12,7 +12,8 @@ class Optimizer:
     Class for performing single crystal refinement
     """
     def __init__(self, path_to_xl, path_to_xs, path_to_ins, input_prefix, output_prefix, use_wine=False,
-                 bond_lengths=None, mixing_pairs=None, use_ml_model=False, ensure_identified_elements=True,
+                 bond_lengths=None, mixing_pairs=None, use_ml_model=False, citrination_api_key=None,
+                 ensure_identified_elements=True,
                  r1_similarity_threshold=0.0075, occupancy_threshold=0.02, r1_threshold=0.1,
                  overall_score_ratio_threshold=1.3,
                  score_weighting=1.0, max_n_leaves=50, least_squares_iterations=4, n_results=10, suppress_output=True,
@@ -67,6 +68,7 @@ class Optimizer:
         self.bond_lengths = bond_lengths
         self.mixing_pairs = mixing_pairs
         self.use_ml_model = use_ml_model
+        self.citrination_api_key = citrination_api_key
         self.ensure_identified_elements = ensure_identified_elements
         self.overall_score_ratio_threshold = overall_score_ratio_threshold
         self.r1_similarity_threshold = r1_similarity_threshold
@@ -75,11 +77,10 @@ class Optimizer:
         self.least_squares_iterations = least_squares_iterations
         self.score_weighting = score_weighting
         self.max_n_leaves = max_n_leaves
-        self.optimizer_steps = OptimizerSteps(self)
         self.n_results = n_results
         self.log_output = log_output
 
-        self.check_inputs()
+        self.validate_inputs()
 
         # Initialize objects to be used during run()
         self.driver = SHELXDriver(ins_path=self.path_to_ins, prefix=self.output_prefix, path_to_xl=self.path_to_xl,
@@ -117,20 +118,20 @@ class Optimizer:
         self.history = OptimizerHistory(self.driver, self.utils, ins_file, self.score_weighting, self.max_n_leaves)
 
         # Optimization
-        self.run_step(self.optimizer_steps.identify_sites)
-        self.run_step(self.optimizer_steps.switch_elements)
+        self.run_step(identify_sites)
+        self.run_step(switch_elements)
         self.history.clean_history()
-        self.run_step(self.optimizer_steps.change_occupancy)
-        self.run_step(self.optimizer_steps.try_exti)
-        self.run_step(self.optimizer_steps.try_anisotropy)
-        pre_weight_leaves = self.history.leaves
-        self.run_step(self.optimizer_steps.use_suggested_weights)
-        self.run_step(self.optimizer_steps.use_suggested_weights)
+        self.run_step(change_occupancy)
+        self.run_step(try_exti)
+        self.run_step(try_anisotropy)
+        pre_weight_leaves = self.history.get_leaves()
+        self.run_step(use_suggested_weights)
+        self.run_step(use_suggested_weights)
 
         for pre_weight_leaf in pre_weight_leaves:
             self.history.clean_history(1, pre_weight_leaf)
 
-        self.run_step(self.optimizer_steps.try_site_mixing)
+        self.run_step(try_site_mixing)
         self.history.clean_history(criteria=["overall_score", "r1_only"])
 
         self.driver.run_SHELXTL(self.history.get_best_history()[-1].ins_file)
@@ -149,10 +150,9 @@ class Optimizer:
         self.generate_graph(os.path.join(results_path, "optimization_graph"))
         print("Graph of optimization process saved to " + os.path.join(results_path, "optimization_graph.pdf"))
         sorted_leaves = self.history.head.get_sorted_leaves()
-        for i in range(0, min(self.n_results, len(self.history.leaves))):
+        for i in range(0, min(self.n_results, len(self.history.get_leaves()))):
             with open(os.path.join(results_path, "{}.res".format(i)), 'w') as f:
                 f.write(sorted_leaves[i].res_file.filetxt)
-
 
     def run_step(self, step):
         """
@@ -160,13 +160,28 @@ class Optimizer:
         :param step: Which optimization step to try
         :return:
         """
-        for leaf in self.history.leaves:
-            step(leaf)
+        for leaf in self.history.get_leaves():
+            step(leaf, self)
 
     def generate_graph(self, output_file):
+        """
+        Generate a graphviz graph of the optimizer history.
+        :param output_file: File location to output the graph
+        :return:
+        """
         self.history.generate_graph(output_file)
 
-    def check_inputs(self):
+    def validate_inputs(self):
+        """
+        Make sure that the optimizer arguments are valid. This will throw an assertion error for any invalid argument.
+        :return:
+        """
+
+        if self.use_ml_model:
+            assert(self.citrination_api_key is not None, "To use the machine learning bond length model, you must "
+                "specify your Citrination API key, which is available at citrination.com/profile. "
+                "If you don't have a free account from citrination.com, you can create one at ?")
+
         if self.bond_lengths is not None:
             assert type(self.bond_lengths) == list, "bond_lengths argument should be a list of tuples of length 3"
             for bl in self.bond_lengths:

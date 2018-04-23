@@ -1,5 +1,7 @@
 import os
-from crystal_refinement.SHELXDriver import SHELXDriver
+
+from crystal_refinement.SHELX.SHELXDriver import SHELXDriver
+
 
 def main():
     # path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL"

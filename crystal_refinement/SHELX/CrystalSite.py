@@ -72,24 +72,48 @@ class CrystalSite:
         return " ".join(line_list)
 
     def get_name(self):
+        """
+        Get the string representation of the site name, which is the element string + site number
+        :return: site name as a string
+        """
         return self.el_string + str(self.site_number)
 
     def get_element(self, capitalized=False):
+        """
+        Get the element name for this crystal site
+        :param capitalized: Whether to capitalize conventionally (Helium would be He)
+        :return: element name
+        """
         if capitalized:
             return self.el_string.capitalize()
         else:
             return self.el_string
 
     def set_element(self, element):
+        """
+        Set the element based on the index
+        :param element: element index to switch to
+        """
         self.element = element
 
     def get_position(self):
+        """
+        Get the position tuple
+        :return: the position of the site as a tuple
+        """
         return self.position
 
     def set_position(self, position):
+        """
+        Set the position tuple
+        """
         self.position = position
 
     def switch_element(self, shelx_element):
+        """
+        Get the position tuple
+        :return: the position of the site as a tuple
+        """
         self.element = shelx_element.index
         self.el_string = shelx_element.name
 

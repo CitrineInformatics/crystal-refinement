@@ -51,8 +51,17 @@ class OptimizerUtils:
 
 
     def get_ml_prediction(self, el1, el2, shelx_file):
+        """
+        Get the bond length prediction from the ML model as a function of the two elements and the formula. Since this
+        prediction should be invariant to element order, it takes the average prediction from the two possible orders.
+        :param el1: Element 1
+        :param el2: Element 2
+        :param shelx_file: shelx file which specifies the formula.
+        :return:
+        """
         formula = shelx_file.get_analytic_formula()
         prediction_key = (self.get_bond_key(el1, el2), formula)
+        # Check the cache first
         if prediction_key in self.prediction_cache:
             return self.prediction_cache[prediction_key][0]
         try:
@@ -61,45 +70,43 @@ class OptimizerUtils:
 
             results = [x["Bond length"] for x in self.ml_model.predict("680", candidate)["candidates"]]
             uncertainty = (results[0][1] + results[1][1]) / 2
+            # Only use the prediction if the uncertainty is low enough
             if uncertainty < 0.5:
                 bond_length_prediction = (results[0][0] + results[1][0]) / 2
                 self.prediction_cache[prediction_key] = [bond_length_prediction, uncertainty]
                 return self.prediction_cache[prediction_key][0]
         except Exception:
             pass
-        # print("Using naive bond length instead of bond length model for {}-{} bond in {}".format(el1, el2, formula))
         self.prediction_cache[prediction_key] = [float(Element(el1).atomic_radius + Element(el2).atomic_radius), 0.0]
         return self.prediction_cache[prediction_key][0]
 
     def get_report(self):
+        """
+        Return a report of the mixing pairs and bond lengths used, and whether they were calculated basd on atomic
+        radii or predicted by the ML model.
+        This currently doesn't specify whether mixing pairs or bond lengths were provided by the user.
+        :return: report as a string
+        """
         report = ""
         report += "Mixing pairs considered: {}\n\n".format(", ".join(["({}, {})".format(e1.get_name(), e2.get_name()) for e1, e2 in self.mixing_pairs]))
-        # for elements, bond_length in self.bond_lengths.items():
-        #     report += "User defined bond lengths:\n"
-        #     report += "Bond: {}-{}, length: {:.3f} ang\n".format(elements[0], elements[1], bond_length)
+
         if self.ml_model is None:
             report += "Bond lengths as calculated based on atomic radii:\n"
-
-            # for i in range(len(self.element_list)):
-            #     for j in range(i, len(self.element_list)):
-            #         el1 = self.element_list[i]
-            #         el2 = self.element_list[j]
-            #         report += "Bond: {}-{}, length: {:.3f} ang\n".format(el1, el2, Element(el1).atomic_radius + Element(el2).atomic_radius)
-
         else:
             report += "Bond lengths as predicted by Citrination machine learning model:\n"
+
         for bond_key, bond_length in sorted(self.bond_lengths.items(), key=lambda tup: tup[1]):
             report += "Bond: {}, length: {:.3f} ang\n".format(bond_key, bond_length)
-            # for k, v in sorted(self.prediction_cache.items()):
-            #     report += "Bond: {}, length: {:.3f} ang, formula: {}".format(k[0], v[0], k[1])
-            #     if v[1] == 0.0:
-            #         report += ", Note: This bond length based on atomic radii due to high machine learning model uncertainty\n"
-            #     else:
-            #         report += "\n"
         report += "\n"
         return report
 
     def get_mixing_pairs(self, shelx_file, probability_threshold):
+        """
+        Get a sorted list of valid mixing pairs based on observed substitution probabilities.
+        :param shelx_file: SHELX file that specifies the list of potential elements.
+        :param probability_threshold: probability threshold for designating a mixing pair as valid
+        :return: sorted list of valid mixing pairs
+        """
         pairs = []
 
         # For all elements in compound, calculate substitution probabilities
@@ -126,6 +133,11 @@ class OptimizerUtils:
         return total
 
     def get_shortest_bond(self, shelx_file):
+        """
+        Get the length of the shortest possible bond given the list of elements
+        :param shelx_file: SHELX file that specifies the list of potential elements.
+        :return: length of the shortest possible bond
+        """
         return sorted([self.get_ideal_bond_length(el.get_name(True), el.get_name(True), shelx_file) for el in shelx_file.elements])[0]
 
     def get_specie(self, el, ox):
@@ -415,11 +427,21 @@ class OptimizerUtils:
                    [float(x.replace("(", "").replace(")", "")) for x in cif_dict["_geom_bond_distance"]])
 
     def get_n_missing_elements(self, shelx_file):
+        """
+        Get the number of missing elements based on the nominal formula
+        :param shelx_file: SHELX file
+        :return:
+        """
         nominal_elements = set(map(lambda el: el.get_name(), shelx_file.elements))
         result_elements = map(lambda site: site.el_string, shelx_file.get_all_sites())
         return len(nominal_elements.difference(result_elements))
 
     def get_stoichiometry_score(self, shelx_file):
+        """
+        Calculate a score for the given shelx file based on how well the composition agrees with the nominal formula
+        :param shelx_file: SHELX file
+        :return:
+        """
         nominal_elements = set(map(lambda el: el.get_name(capitalize=True), shelx_file.elements))
         nominal_formula = Composition(shelx_file.get_nominal_formula())
         try:

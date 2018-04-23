@@ -24,9 +24,16 @@ class OptimizerIteration:
         self.stoich_score = stoich_score
 
     def add_child(self, child):
+        """
+        Add a child iteration to the current iteration node
+        :param child: iteration to add as a child
+        """
         self.children.append(child)
 
     def get_full_history(self):
+        """
+        Get the path of nodes from the root node to this node
+        """
         history = []
         cur_iter = self
         while True:
@@ -38,6 +45,10 @@ class OptimizerIteration:
         return history
 
     def get_leaves(self):
+        """
+        Get all leaf nodes with this node as the root.
+        :return:
+        """
         leaves = []
         if len(self.children) == 0:
             if self.dead_branch:
@@ -50,12 +61,25 @@ class OptimizerIteration:
         return leaves
 
     def get_res_copy(self):
+        """
+        Get a copy of the res file associated with this node.
+        :return:
+        """
         return copy.deepcopy(self.res_file)
 
     def get_ins_copy(self):
+        """
+        Get a copy of the ins file associated with this node.
+        :return:
+        """
         return copy.deepcopy(self.ins_file)
 
     def generate_graph(self, output_file):
+        """
+        Generate a graphviz image of the tree with this node as the root
+        :param output_file: the file destination to output the image
+        :return:
+        """
         dot = Digraph()
         node_label = str(random.getrandbits(32))
         dot.node(node_label, str(self.r1), color="green")
@@ -65,6 +89,15 @@ class OptimizerIteration:
         dot.render(output_file, view=False)
 
     def _generate_graph(self, node_label, parent_label, dot, sorted_leaves):
+        """
+        Actually do the work to generate the graph. This function is recursive.
+        :param node_label: graphviz label for the current node. This is supposed to be unique among the nodes in the
+        graph, so we just generate a random one.
+        :param parent_label: graphviz label for the parent node so that we can hook them up
+        :param dot: the graphviz object
+        :param sorted_leaves: ranking of the leaves so we can label nodes with rank when necessary.
+        :return:
+        """
         highlight = False
         for i, child in enumerate(self.children):
             if child._generate_graph(str(random.getrandbits(32)), node_label, dot, sorted_leaves):
@@ -93,6 +126,12 @@ class OptimizerIteration:
 
 
     def generate_truncated_graph(self, output_file):
+        """
+        Generate a graphviz image of a truncated tree with this node as the root. If all children of a node are dead
+        branches, the children for that node will not be rendered.
+        :param output_file: the file destination to output the image
+        :return:
+        """
         dot = Digraph()
         node_label = str(random.getrandbits(32))
         dot.node(node_label, "r1: {}\nbond: {}\nmissing_elements: {}\noverall:{}".format(self.r1, self.bond_score, self.n_missing_elements, self.get_score()), color="green")
@@ -101,8 +140,15 @@ class OptimizerIteration:
         dot.render(output_file, view=False)
 
     def _generate_truncated_graph(self, node_label, dot, sorted_leaves):
-        # The parent node (this) controls the rendering of it's child nodes
-        # if all children are dead branches, don't render any children
+        """
+        Actually do the work to generate the truncated graph. This function is recursive.
+        :param node_label: graphviz label for the current node. This is supposed to be unique among the nodes in the
+        graph, so we just generate a random one.
+        :param dot: the graphviz object
+        :param sorted_leaves: ranking of the leaves so we can label nodes with rank when necessary.
+        :return:
+        """
+
         highlight = False
         for child in self.children:
             child_label = str(random.getrandbits(32))
@@ -136,6 +182,9 @@ class OptimizerIteration:
         return highlight
 
     def is_dead_branch(self):
+        """
+        :return: If this node is in a dead branch
+        """
         if self.dead_branch:
             return True
         else:
@@ -147,7 +196,10 @@ class OptimizerIteration:
         return True
 
     def update_dead_branches(self):
-
+        """
+        Update the dead branch labels of all nodes under this root. If a node has no children, it is labeled as dead.
+        :return:
+        """
         if self.is_dead_branch():
             self.dead_branch = True
         else:
@@ -161,8 +213,11 @@ class OptimizerIteration:
                         dead_branch = False
                 self.dead_branch = dead_branch
 
-    # Copy this iteration into the next generation
     def propagate(self):
+        """
+        Copy this iteration into the next generation.
+        :return:
+        """
         new_annotation = None
         if self.annotation is not None:
             new_annotation = "Propagated from previous generation"
@@ -171,6 +226,11 @@ class OptimizerIteration:
         self.children.append(new_child)
 
     def get_score(self, criterion="overall_score"):
+        """
+        Get the score associated with the .res file of this node
+        :param criterion:
+        :return:
+        """
         assert criterion in ["overall_score", "r1_only", "bond_only", "missing_elements"], "{} is not a supported criterion".format(
             criterion)
         if criterion == "overall_score":
@@ -200,6 +260,11 @@ class OptimizerIteration:
             return self.stoich_score
 
     def get_sorted_leaves(self, criteria="overall_score"):
+        """
+        Return the leaf nodes underneath this node sorted by the provided criteria.
+        :param criteria: to sort by
+        :return:
+        """
         if type(criteria) != list:
             criteria = [criteria]
 
@@ -216,91 +281,9 @@ class OptimizerIteration:
 
         return deduplicated
 
-    def get_best(self):
-        return self.get_sorted_leaves()[0]
-
-
-class OptimizerHistory:
-    """
-    Define class to hold information optimizer history information
-    """
-    def __init__(self, driver, utils, ins_file, score_weighting=1.0, max_n_leaves=50):
-        self.driver = driver
-        self.utils = utils
-        self.score_weighting = score_weighting
-        res = self.driver.run_SHELXTL(ins_file)
-        bonds = self.utils.get_bonds(self.driver, res)
-        self.head = OptimizerIteration(None, ins_file, res, self.utils.score_compound_bonds_relative_distance(bonds, ins_file, self.driver),
-                                       self.utils.get_n_missing_elements(res), self.utils.get_stoichiometry_score(res), score_weighting=self.score_weighting)
-
-        self.leaves = [self.head]
-        self.max_n_leaves = max_n_leaves
-
-    def run_iter(self, ins_file, parent_iteration, annotation=None):
+    def get_best(self, criteria="overall_score"):
         """
-        Run the given ins file through SHELXTL and record the file and resulting r1
-
-        :param ins_file: SHELXFile object
-        :return res: SHELXFile object
+        Return the best leaf node under this one according to the provided critera
+        :return:
         """
-        res = self.driver.run_SHELXTL(ins_file)
-        if res is None:
-            return None
-        # If refinement is unstable, no cif file will be generated. The iteration should fail then
-        try:
-            bonds = self.utils.get_bonds(self.driver, res)
-            if len(bonds) == 0:
-                return None
-
-            new_iter = OptimizerIteration(parent_iteration, ins_file, res,
-                                          self.utils.score_compound_bonds_relative_distance(bonds, res, self.driver),
-                                          self.utils.get_n_missing_elements(res),
-                                          self.utils.get_stoichiometry_score(res), score_weighting=self.score_weighting,
-                                          annotation=annotation)
-        # This throws a FileNotFound error in python3, let's just try catching everything for now...
-        # except (IndexError, ZeroDivisionError):
-        except:
-            return None
-
-        return new_iter
-
-    def clean_history(self, n_to_keep=None, branch=None, criteria="overall_score"):
-        """
-        Prune the tree according to overall scores.
-        :param n_to_keep: Number of leaves to keep.
-        :param branch: Branch to prune.
-        """
-        if branch is None:
-            branch = self.head
-        if n_to_keep is None:
-            n_to_keep = self.max_n_leaves
-        if len(branch.get_leaves()) > n_to_keep:
-            sorted_leaves = branch.get_sorted_leaves(criteria)
-            for i in range(n_to_keep, len(branch.get_leaves())):
-                # print("Dropping leaf: ")
-                # print(sorted_leaves[i].ins_file.get_crystal_sites_text())
-                sorted_leaves[i].dead_branch = True
-            self.update_leaves()
-
-
-    def save(self, iterations):
-        if not isinstance(iterations, list):
-            iterations = [iterations]
-        for iteration in iterations:
-            iteration.parent.add_child(iteration)
-        self.update_leaves()
-
-    def run_and_save(self, ins_file, parent_iteration, annotation=None):
-        iteration = self.run_iter(ins_file, parent_iteration, annotation)
-        if iteration is not None:
-            self.save(iteration)
-        return iteration
-
-    def update_leaves(self):
-        self.leaves = self.head.get_leaves()
-
-    def get_best_history(self):
-        return self.head.get_best().get_full_history()
-
-    def generate_graph(self, output_file):
-        self.head.generate_graph(output_file)
+        return self.get_sorted_leaves(criteria)[0]
