@@ -195,7 +195,7 @@ class SHELXFile:
         formula = ""
         for el in self.elements:
             formula += "{}{}".format(el.get_name(True), el.nominal_stoichiometry)
-        return Composition(formula).alphabetical_formula
+        return Composition(formula)
 
     def get_analytic_formula(self):
         formula = ""
@@ -203,7 +203,7 @@ class SHELXFile:
             el = site.el_string.capitalize()
             stoich = self.get_site_stoichiometry(site)
             formula += "{}{}".format(el, stoich)
-        return Composition(formula).alphabetical_formula
+        return Composition(formula)
 
     def move_q_to_crystal(self):
         """

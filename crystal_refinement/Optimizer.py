@@ -4,7 +4,7 @@ import shutil
 from OptimizerSteps import *
 from crystal_refinement.SHELX.SHELXDriver import SHELXDriver
 from crystal_refinement.history.OptimizerHistory import OptimizerHistory
-from crystal_refinement.utils.OptimizerUtils import OptimizerUtils
+from crystal_refinement.utils.OptimizerCache import OptimizerCache
 
 
 class Optimizer:
@@ -86,7 +86,7 @@ class Optimizer:
         self.driver = SHELXDriver(ins_path=self.path_to_ins, prefix=self.output_prefix, path_to_xl=self.path_to_xl,
                                   path_to_xs=self.path_to_xs, use_wine=self.use_wine, suppress_ouput=suppress_output)
         self.history = None
-        self.utils = None
+        self.cache = None
 
     def run(self):
         """
@@ -114,8 +114,13 @@ class Optimizer:
             print(ins_file.to_string())
         ins_file.remove_command('L.S.')
         ins_file.add_command('L.S.', [str(self.least_squares_iterations)])
-        self.utils = OptimizerUtils(ins_file, self.bond_lengths, self.mixing_pairs, self.use_ml_model)
-        self.history = OptimizerHistory(self.driver, self.utils, ins_file, self.score_weighting, self.max_n_leaves)
+        self.cache = OptimizerCache(ins_file,
+                                    self.bond_lengths,
+                                    self.mixing_pairs,
+                                    self.use_ml_model,
+                                    self.citrination_api_key)
+
+        self.history = OptimizerHistory(self.driver, self.cache, ins_file, self.score_weighting, self.max_n_leaves)
 
         # Optimization
         self.run_step(identify_sites)
@@ -144,7 +149,7 @@ class Optimizer:
                 f.write("WARN: High initial R1 score, there may be something wrong with the assignment of sites to electron density peaks\n")
             if self.history.get_best_history()[-1].r1 > 0.1:
                 f.write("WARN: High final R1 score, the optimization may not have been successful\n")
-            f.write(self.utils.get_report())
+            f.write(self.cache.get_report())
             print("Report on optimization process written to " + os.path.join(results_path, "report.txt"))
             print("Output res files for top {} results saved in ".format(self.n_results) + results_path)
         self.generate_graph(os.path.join(results_path, "optimization_graph"))
@@ -178,9 +183,11 @@ class Optimizer:
         """
 
         if self.use_ml_model:
-            assert(self.citrination_api_key is not None, "To use the machine learning bond length model, you must "
-                "specify your Citrination API key, which is available at citrination.com/profile. "
-                "If you don't have a free account from citrination.com, you can create one at ?")
+            assert self.citrination_api_key is not None, "To use the machine learning bond length model, you must " \
+                                                         "specify your Citrination API key, which is available at " \
+                                                         "https://citrination.com/users/edit. If you don't have a " \
+                                                         "Citrination account, you can create a free account at " \
+                                                         "https://citrination.com"
 
         if self.bond_lengths is not None:
             assert type(self.bond_lengths) == list, "bond_lengths argument should be a list of tuples of length 3"

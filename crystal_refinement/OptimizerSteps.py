@@ -1,5 +1,6 @@
 import re
 import numpy as np
+import crystal_refinement.utils.bond_utils as bond_utils
 
 
 def identify_sites(initial, optimizer):
@@ -39,7 +40,7 @@ def reset_origin(initial, optimizer):
     if iteration is not None:
         optimizer.history.save(iteration)
         # Try to add additional sites
-        try_add_q(iteration)
+        try_add_q(iteration, optimizer)
 
 
 def identify_sites_by_bond_length(initial, optimizer):
@@ -47,18 +48,18 @@ def identify_sites_by_bond_length(initial, optimizer):
     If the initial r1 is large, use bond lengths instead of the r1 score as the criteria for identifying which
     electron density peaks are atom sites
     """
-    ins_file = initial.res_file
+
     # Identify shortest possible bond based on available elements
-    shortest_possible_bond = optimizer.utils.get_shortest_bond(ins_file)
+    shortest_possible_bond = optimizer.cache.get_shortest_bond()
     prev_iteration = initial
     for i in range(5):
         new_ins = prev_iteration.get_res_copy()
         sites_to_remove = set()
-        for bond in sorted(optimizer.utils.get_bonds(optimizer.driver, new_ins), key=lambda tup: tup[2]):
+        for bond in sorted(bond_utils.get_bonds(optimizer.driver, new_ins)):
             # Threshold on how short the bonds are
-            if bond[2] / shortest_possible_bond < 0.75:
-                a1_num = int(re.search('\d+', bond[0]).group(0))
-                a2_num = int(re.search('\d+', bond[1]).group(0))
+            if bond.length / shortest_possible_bond < 0.75:
+                a1_num = int(re.search('\d+', bond.el1).group(0))
+                a2_num = int(re.search('\d+', bond.el2).group(0))
                 index_to_remove = max(a1_num, a2_num)
                 for site in new_ins.get_sites_by_index(index_to_remove):
                     sites_to_remove.add(site)
@@ -114,31 +115,37 @@ def try_remove_site(initial, optimizer):
     """
     ins_file = initial.res_file
     r_penalty = 1.1
-    bonds = optimizer.utils.get_bonds(optimizer.driver, ins_file)
+    bonds = bond_utils.get_bonds(optimizer.driver, ins_file)
     threshold = 0.05
+    removal_sets_tried = set()
     while True:
         new_ins = initial.get_res_copy()
         sites_to_remove = set()
         distance_ratios = []
-        for a1, a2, distance in bonds:
-            ideal_distance = optimizer.utils.get_ideal_bond_length(a1, a2, new_ins)
-            distance_ratio = (ideal_distance - distance) / ideal_distance
-            a1_num = int(re.search('\d+', a1).group(0))
-            a2_num = int(re.search('\d+', a2).group(0))
+        for bond in bonds:
+            ideal_distance = optimizer.cache.get_ideal_bond_length(*bond.get_normalized_element_names())
+            distance_ratio = (ideal_distance - bond.length) / ideal_distance
+            a1_num = int(re.search('\d+', bond.el1).group(0))
+            a2_num = int(re.search('\d+', bond.el2).group(0))
             index_to_remove = max(a1_num, a2_num)
             for site in new_ins.get_sites_by_index(index_to_remove):
                 distance_ratios.append((distance_ratio, site))
             # if the distance is too small, remove the site with lower electron density
-            if (ideal_distance - distance) / ideal_distance > threshold:
+            if (ideal_distance - bond.length) / ideal_distance > threshold:
                 for site in new_ins.get_sites_by_index(index_to_remove):
                     sites_to_remove.add(site)
-
+        set_code = ", ".join(sorted(map(lambda site: site.get_name(), sites_to_remove)))
+        if set_code in removal_sets_tried:
+            threshold *= 1.1
+            continue
+        else:
+            removal_sets_tried.add(set_code)
         # no sites removed
         if len(sites_to_remove) == 0:
             break
         new_ins.remove_sites(sites_to_remove)
 
-        annotation = "Removed {} site(s)".format(len(sites_to_remove))
+        annotation = "Removed sites {}".format(set_code)
         if optimizer.log_output:
             print("Trying step: {}".format(annotation))
         cur_iter = optimizer.history.run_iter(new_ins, initial, annotation)
@@ -223,7 +230,7 @@ def try_site_mixing(initial, optimizer):
     Only handles pair-wise mixing.
     """
 
-    pairs = optimizer.utils.mixing_pairs
+    pairs = optimizer.cache.mixing_pairs
 
     # Set of sites where mixing has already been applied
     tried = set()
@@ -243,10 +250,10 @@ def _do_site_mixing(initial, tried, pairs, optimizer):
     """
 
     ins_file = initial.res_file
-    bonds = optimizer.utils.get_bonds(optimizer.driver, ins_file)
-    # site_bond_scores = get_site_bond_scores(bonds, cache, n_bonds)
-    # mixing_priority = map(lambda tup: (int(re.search("\d+", tup[0]).group(0)), tup[1]), site_bond_scores)
-    mixing_priority = optimizer.utils.site_mixing_priority(bonds, ins_file)
+    bonds = bond_utils.get_bonds(optimizer.driver, ins_file)
+
+    site_bond_scores = bond_utils.get_site_bond_scores(bonds, optimizer.cache, ins_file, n_bonds=2)
+    mixing_priority = map(lambda tup: (int(re.search("\d+", tup[0]).group(0)), tup[1]), site_bond_scores)
 
     # In case of ties, find all top tied priorities
     top_priority_score = mixing_priority[0][1]
@@ -302,7 +309,7 @@ def _do_site_mixing(initial, tried, pairs, optimizer):
                 continue
 
             # Pick the best element pair of all tried
-            iterations.sort(key=lambda i: i.r1)
+            iterations.sort(key=lambda x: x.r1)
             best_r1 = min([prev_iter.r1, iterations[0].r1])
             if iterations[0].r1 - best_r1 < optimizer.r1_similarity_threshold:
                 optimizer.history.save(iterations[0])
@@ -349,7 +356,6 @@ def try_exti(initial, optimizer):
     if optimizer.log_output:
         print("Trying step: {}".format(annotation))
     iteration = optimizer.history.run_iter(new_ins, initial, "Added extinction")
-
 
     # If exti helped, add it to the history
     if iteration is not None:

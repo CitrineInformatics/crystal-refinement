@@ -12,7 +12,7 @@ class Bond:
         """
         self.el1 = el1
         self.el2 = el2
-        self.length = length
+        self.length = float(length)
 
     def get_normalized_element_names(self):
         """
@@ -28,11 +28,14 @@ class Bond:
             return -1
         if self.length == other.length:
             return 0
-        if self.length < other.length:
+        if self.length > other.length:
             return 1
 
+    def __str__(self):
+        return "{}-{}: {}".format(self.el1, self.el2, self.length)
 
-def get_site_bond_scores(bonds, cache, n_bonds=4):
+
+def get_site_bond_scores(bonds, cache, shelx_file, n_bonds=4):
     """
     Get a score for each site based on bond lengths.
     :param bonds: List of bond tuples (atom1, atom2, distance) for which to calculate priority
@@ -40,13 +43,13 @@ def get_site_bond_scores(bonds, cache, n_bonds=4):
     :param n_bonds: number of nearest neighbor bonds to incorporate in the score for each site
     :return: List of (site number, site score) tuples sorted with decreasing score ("worst" first).
     """
-    nn_bonds_by_site = get_nn_bonds_by_site(bonds, cache)
+    nn_bonds_by_site = get_nn_bonds_by_site(bonds, shelx_file)
 
     bond_by_atom = defaultdict(lambda: [])
-    for bond in nn_bonds_by_site:
+    for bond in nn_bonds_by_site.values():
         bond_score = get_bond_score(bond, nn_bonds_by_site, cache)
-        bond_by_atom[bond[0]].append(bond_score)
-        bond_by_atom[bond[1]].append(bond_score)
+        bond_by_atom[bond.el1].append(bond_score)
+        bond_by_atom[bond.el2].append(bond_score)
     # Average over scores from n_bonds shortest bonds
     res = map(lambda tup: (tup[0], sum(sorted(tup[1])[:n_bonds])), bond_by_atom.items())
 
@@ -64,10 +67,10 @@ def get_bond_score(bond, nn_bonds_by_site, cache):
     appended with the difference between the bond lengths (some notion of how "wrong" it is).
     """
     score = 0.0
-    ideal_bond_length = cache.get_bond_length(**bond.get_normalized_element_names())
+    ideal_bond_length = cache.get_ideal_bond_length(*bond.get_normalized_element_names())
 
-    for other_bond in nn_bonds_by_site:
-        other_ideal_bond_length = cache.get_bond_length(**other_bond.get_normalized_element_names())
+    for other_bond in nn_bonds_by_site.values():
+        other_ideal_bond_length = cache.get_ideal_bond_length(*other_bond.get_normalized_element_names())
 
         # Get the ideal and actual ordering for the bond lengths
         ideal_comp = ideal_bond_length < other_ideal_bond_length
@@ -86,18 +89,19 @@ def get_bond_score(bond, nn_bonds_by_site, cache):
     return score
 
 
-def get_nn_bonds_by_site(bonds, cache):
+def get_nn_bonds_by_site(bonds, shelx_file):
     """
     Get the first nearest neighbor bond associated with each site
     :param bonds: All bonds in the compound
     :param cache: OptimizerCache object
     :return: dictionary where the key is the site name and the value is the nearest neighbor bond for that site
     """
+
     sorted_bonds = sorted(bonds)
 
     nn_bonds_by_site = {}
 
-    for site in cache.element_list:
+    for site in shelx_file.get_all_sites():
         site_name = "{}{}".format(site.el_string, site.site_number)
         for bond in sorted_bonds:
             if site_name == bond.el1.upper() or site_name == bond.el2.upper():

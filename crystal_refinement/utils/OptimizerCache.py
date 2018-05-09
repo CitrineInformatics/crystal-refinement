@@ -2,6 +2,7 @@ import itertools
 from pymatgen import Element
 from pymatgen.structure_prediction.substitution_probability import SubstitutionProbability
 from citrination_client import CitrinationClient
+from crystal_refinement.utils.bond_utils import Bond
 
 
 class OptimizerCache:
@@ -14,6 +15,7 @@ class OptimizerCache:
     def __init__(self, shelx_file, bond_lengths=None, mixing_pairs=None, use_ml_model=False, api_key=None):
         # Chemistry information
         self.element_list = shelx_file.elements
+        self.element_names_list = [el.get_name(True) for el in self.element_list]
         self.nominal_formula = shelx_file.get_nominal_formula()
 
         # Bond length information
@@ -25,14 +27,14 @@ class OptimizerCache:
         self.bond_lengths = {}
 
         # Populate bond length cache
-        for el1 in self.element_list:
-            for el2 in self.element_list:
-                self.get_bond_length(el1, el2)
+        for el1 in self.element_names_list:
+            for el2 in self.element_names_list:
+                self.bond_lengths[self._get_bond_key(el1, el2)] = Bond(el1, el2, self.get_ideal_bond_length(el1, el2))
 
         # Replace with any user-provided bond lengths
         if bond_lengths is not None:
             for el1, el2, bond_length in bond_lengths:
-                self.bond_lengths[self._get_bond_key(el1, el2)] = bond_length
+                self.bond_lengths[self._get_bond_key(el1, el2)] = Bond(el1, el2, bond_length)
 
         # Mixing pairs information
         if mixing_pairs is None:
@@ -56,7 +58,7 @@ class OptimizerCache:
         """
         return "-".join(sorted([el1, el2]))
 
-    def get_bond_length(self, el1, el2):
+    def get_ideal_bond_length(self, el1, el2):
         """
         Get the bond length as a function of the two elements and the formula. This
         :param el1: Element 1
@@ -68,7 +70,7 @@ class OptimizerCache:
         bond_key = self._get_bond_key(el1, el2)
         # Check the cache first
         if bond_key in self.bond_lengths:
-            return self.bond_lengths[bond_key]
+            return self.bond_lengths[bond_key].length
 
         bond_length = None
 
@@ -77,7 +79,7 @@ class OptimizerCache:
         if bond_length is None:
             bond_length = self.get_naive_bond_length(el1, el2)
 
-        self.bond_lengths[bond_key] = bond_length
+        self.bond_lengths[bond_key] = Bond(el1, el2, bond_length)
 
         return bond_length
 
@@ -124,7 +126,7 @@ class OptimizerCache:
         :return: length of the shortest possible bond
         """
 
-        return sorted(self.bond_lengths.values())[0]
+        return sorted(self.bond_lengths.values())[0].length
 
     def get_mixing_pairs(self, probability_threshold):
         """
@@ -186,7 +188,7 @@ class OptimizerCache:
         else:
             report += "Bond lengths as predicted by Citrination machine learning model:\n"
 
-        for bond_key, bond_length in sorted(self.bond_lengths.items(), key=lambda tup: tup[1]):
-            report += "Bond: {}, length: {:.3f} ang\n".format(bond_key, bond_length)
+        for bond_key, bond in sorted(self.bond_lengths.items()):
+            report += "Bond: {}, length: {:.3f} ang\n".format(bond_key, bond.length)
         report += "\n"
         return report

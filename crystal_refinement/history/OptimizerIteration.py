@@ -1,27 +1,55 @@
-import copy, random, math
+import copy, random
 from graphviz import Digraph
 from collections import OrderedDict
 from itertools import chain
+from crystal_refinement.utils import optimizer_scores as scores
 
 
 class OptimizerIteration:
+
     """
     Define class to hold information on one optimizer iteration
     """
-    def __init__(self, parent, ins_file, res_file, bond_score, n_missing_elements, stoich_score, score_weighting=1.0, annotation=None):
+    def __init__(self, parent, ins_file, res_file, r1, bond_score, n_missing_elements, stoich_score, overall_score,
+                 score_weighting=1.0, annotation=None):
         self.ins_file = copy.deepcopy(ins_file)
         self.res_file = copy.deepcopy(res_file)
-        self.r1 = res_file.r1
-        self.bond_score = bond_score
-        # the higher this is, the more the r1 counts. Must be between 0 and 1
-        self.score_weighting = score_weighting
 
         self.parent = parent
         self.dead_branch = False
         self.children = []
         self.annotation = annotation
+
+        # the higher this is, the more the r1 counts. Must be between 0 and 1
+        self.score_weighting = score_weighting
+        self.r1 = r1
+        self.bond_score = bond_score
         self.n_missing_elements = n_missing_elements
         self.stoich_score = stoich_score
+        self.overall_score = overall_score
+
+    @classmethod
+    def build_with_bond_list(cls, parent, ins_file, res_file, bonds, cache, score_weighting=1.0, annotation=None):
+        r1 = res_file.r1
+        bond_score = scores.get_compound_bond_score(bonds, res_file, cache)
+        n_missing_elements = scores.get_missing_element_score(res_file, cache)
+        stoich_score = scores.get_stoichiometry_score(res_file, cache)
+        return cls(
+            parent=parent,
+            ins_file=copy.deepcopy(ins_file),
+            res_file=copy.deepcopy(res_file),
+            r1=r1,
+            bond_score=bond_score,
+            n_missing_elements=n_missing_elements,
+            stoich_score=stoich_score,
+            overall_score=scores.get_overall_score(r1,
+                                                   bond_score,
+                                                   n_missing_elements,
+                                                   stoich_score,
+                                                   score_weighting),
+            score_weighting=score_weighting,
+            annotation=annotation
+        )
 
     def add_child(self, child):
         """
@@ -124,7 +152,6 @@ class OptimizerIteration:
 
         return highlight
 
-
     def generate_truncated_graph(self, output_file):
         """
         Generate a graphviz image of a truncated tree with this node as the root. If all children of a node are dead
@@ -221,8 +248,17 @@ class OptimizerIteration:
         new_annotation = None
         if self.annotation is not None:
             new_annotation = "Propagated from previous generation"
-        new_child = OptimizerIteration(self, self.get_ins_copy(), self.get_res_copy(), self.bond_score, self.n_missing_elements, self.stoich_score, self.score_weighting,
-        new_annotation)
+        new_child = OptimizerIteration(self,
+                                       self.ins_file,
+                                       self.res_file,
+                                       self.r1,
+                                       self.bond_score,
+                                       self.n_missing_elements,
+                                       self.stoich_score,
+                                       self.overall_score,
+                                       self.score_weighting,
+                                       new_annotation)
+
         self.children.append(new_child)
 
     def get_score(self, criterion="overall_score"):
@@ -234,22 +270,7 @@ class OptimizerIteration:
         assert criterion in ["overall_score", "r1_only", "bond_only", "missing_elements"], "{} is not a supported criterion".format(
             criterion)
         if criterion == "overall_score":
-            bond_score_basis = 0.1
-            missing_elements_basis = 0.05
-            stoich_score_basis = 0.1
-            # return math.pow(self.r1, self.score_weighting) + math.pow(self.bond_score, 1 - self.score_weighting)
-            # return (1.0 + math.pow(self.r1 / r1_basis, self.score_weighting)) \
-            #        * (1.0 + math.pow(self.bond_score / bond_score_basis, 1 - self.score_weighting))
-            # try:
-            return math.pow(self.r1, self.score_weighting) * \
-                   math.pow(self.bond_score + bond_score_basis, 1 - self.score_weighting) + \
-                   missing_elements_basis * self.n_missing_elements ** 2 + \
-                   stoich_score_basis * self.stoich_score
-            # except TypeError:
-            #     print(self.r1, self.score_weighting, self.bond_score, self.n_missing_elements)
-            #     quit()
-            # return self.r1 * self.bond_score
-            # return (self.r1, len(self.res_file.mixed_site_numbers))
+            return self.overall_score
         if criterion == "r1_only":
             return self.r1
         if criterion == "bond_only":
