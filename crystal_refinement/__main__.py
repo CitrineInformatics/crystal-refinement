@@ -22,18 +22,10 @@ def main():
                             help="Configuration file specifying additional parameters for the optimizer")
 
     args = arg_parser.parse_args()
-    # input_directory = args.directory
-    # input_prefix = args.input_prefix
-    # output_prefix = args.output_prefix
-    # config_file = args.config_file
-
-    input_directory = "examples"
-    input_prefix = "input"
-    output_prefix = "test"
-    import os
-    os.chdir("..")
-    print(os.getcwd())
-    config_file = "working.yml"
+    input_directory = args.directory
+    input_prefix = args.input_prefix
+    output_prefix = args.output_prefix
+    config_file = args.config_file
 
     with open(config_file) as f:
         config = yaml.load(f)

@@ -5,7 +5,7 @@ from pymatgen import Element
 #     from pymatgen.analysis.structure_prediction.substitution_probability import SubstitutionProbability
 # except ImportError:
 #     from pymatgen.structure_prediction.substitution_probability import SubstitutionProbability
-from pymatgen.analysis.structure_prediction.substitution_probability import SubstitutionProbability
+from pymatgen.structure_prediction.substitution_probability import SubstitutionProbability
 
 from citrination_client import CitrinationClient
 from crystal_refinement.utils.bond_utils import Bond

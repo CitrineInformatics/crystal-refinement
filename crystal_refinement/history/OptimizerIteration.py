@@ -34,7 +34,7 @@ class OptimizerIteration:
     def build_with_bond_list(cls, parent, ins_file, res_file, bonds, cache, score_weighting=1.0, annotation=None):
         r1 = res_file.r1
         bond_score = scores.get_compound_bond_score(bonds, res_file, cache)
-        n_missing_elements = scores.get_missing_element_score(res_file, cache)
+        n_missing_elements = scores.get_missing_element_penalty(res_file, cache)
         stoich_score = scores.get_stoichiometry_score(res_file, cache)
         anisotropy_penalty = scores.get_negative_anisotropic_penalty(res_file)
         return cls(
