@@ -3,3 +3,8 @@ crystal_refinement/workbench.py
 *.pyc
 output/
 .DS_store
+build/
+crystal_refinement.egg-info/
+dist/
+testing/
+testing3/
