@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import copy, random
 from graphviz import Digraph
 from collections import OrderedDict
@@ -10,8 +11,8 @@ class OptimizerIteration:
     """
     Define class to hold information on one optimizer iteration
     """
-    def __init__(self, parent, ins_file, res_file, r1, bond_score, n_missing_elements, stoich_score, overall_score,
-                 score_weighting=1.0, annotation=None):
+    def __init__(self, parent, ins_file, res_file, r1, bond_score, n_missing_elements, stoich_score, anisotropy_penalty,
+                 overall_score, score_weighting=1.0, annotation=None):
         self.ins_file = copy.deepcopy(ins_file)
         self.res_file = copy.deepcopy(res_file)
 
@@ -26,6 +27,7 @@ class OptimizerIteration:
         self.bond_score = bond_score
         self.n_missing_elements = n_missing_elements
         self.stoich_score = stoich_score
+        self.anisotropy_penalty = anisotropy_penalty
         self.overall_score = overall_score
 
     @classmethod
@@ -34,6 +36,7 @@ class OptimizerIteration:
         bond_score = scores.get_compound_bond_score(bonds, res_file, cache)
         n_missing_elements = scores.get_missing_element_score(res_file, cache)
         stoich_score = scores.get_stoichiometry_score(res_file, cache)
+        anisotropy_penalty = scores.get_negative_anisotropic_penalty(res_file)
         return cls(
             parent=parent,
             ins_file=copy.deepcopy(ins_file),
@@ -42,10 +45,12 @@ class OptimizerIteration:
             bond_score=bond_score,
             n_missing_elements=n_missing_elements,
             stoich_score=stoich_score,
+            anisotropy_penalty=anisotropy_penalty,
             overall_score=scores.get_overall_score(r1,
                                                    bond_score,
                                                    n_missing_elements,
                                                    stoich_score,
+                                                   anisotropy_penalty,
                                                    score_weighting),
             score_weighting=score_weighting,
             annotation=annotation
@@ -143,11 +148,9 @@ class OptimizerIteration:
         if self.dead_branch:
             color = "red"
         if len(self.children) == 0 and rank >= 0:
-            dot.node(node_label, "r1: {}\nbond: {}\nmissing_elements: {}\noverall:{}\nrank:{}"
-                     .format(self.r1, self.bond_score, self.n_missing_elements, self.get_score(), rank + 1), color=color)
+            dot.node(node_label, self.generate_label(rank=rank+1), color=color)
         else:
-            dot.node(node_label, "r1: {}\nbond: {}\nmissing_elements: {}\noverall:{}".format(self.r1, self.bond_score, self.n_missing_elements, self.get_score()),
-                     color=color)
+            dot.node(node_label, self.generate_label(), color=color)
         dot.edge(parent_label, node_label, color=color, label=self.annotation)
 
         return highlight
@@ -161,7 +164,7 @@ class OptimizerIteration:
         """
         dot = Digraph()
         node_label = str(random.getrandbits(32))
-        dot.node(node_label, "r1: {}\nbond: {}\nmissing_elements: {}\noverall:{}".format(self.r1, self.bond_score, self.n_missing_elements, self.get_score()), color="green")
+        dot.node(node_label, self.generate_label(), color="green")
         sorted_leaves = self.get_sorted_leaves()
         self._generate_truncated_graph(node_label, dot, sorted_leaves)
         dot.render(output_file, view=False)
@@ -189,16 +192,11 @@ class OptimizerIteration:
             if len(child.children) == 0:
                 try:
                     rank = sorted_leaves.index(child)
-                    dot.node(child_label, "r1: {}\nbond: {}\nmissing_elements: {}\noverall:{}\nrank:{}"
-                     .format(self.r1, self.bond_score, self.n_missing_elements, self.get_score(), rank + 1),
-                             color=color)
+                    dot.node(child_label, self.generate_label(rank=rank + 1), color=color)
                 except ValueError:
-                    dot.node(child_label,
-                             "r1: {}\nbond: {}\nmissing_elements: {}\noverall:{}".format(self.r1, self.bond_score, self.n_missing_elements, self.get_score()),
-                             color=color)
+                    dot.node(child_label, self.generate_label(), color=color)
             else:
-                dot.node(child_label, "r1: {}\nbond: {}\nmissing_elements: {}\noverall:{}".format(self.r1, self.bond_score, self.n_missing_elements, self.get_score()),
-                         color=color)
+                dot.node(child_label, self.generate_label(), color=color)
             dot.edge(node_label, child_label, color=color, label=child.annotation)
 
         if len(self.children) == 0:
@@ -255,6 +253,7 @@ class OptimizerIteration:
                                        self.bond_score,
                                        self.n_missing_elements,
                                        self.stoich_score,
+                                       self.anisotropy_penalty,
                                        self.overall_score,
                                        self.score_weighting,
                                        new_annotation)
@@ -267,8 +266,8 @@ class OptimizerIteration:
         :param criterion:
         :return:
         """
-        assert criterion in ["overall_score", "r1_only", "bond_only", "missing_elements"], "{} is not a supported criterion".format(
-            criterion)
+        assert criterion in ["overall_score", "r1_only", "bond_only", "missing_elements", "stoich_only", "anisotropy_only"],\
+            "{} is not a supported criterion".format(criterion)
         if criterion == "overall_score":
             return self.overall_score
         if criterion == "r1_only":
@@ -279,6 +278,8 @@ class OptimizerIteration:
             return self.n_missing_elements
         if criterion == "stoich_only":
             return self.stoich_score
+        if criterion == "anisotropy_only":
+            return self.anisotropy_penalty
 
     def get_sorted_leaves(self, criteria="overall_score"):
         """
@@ -301,6 +302,25 @@ class OptimizerIteration:
         deduplicated = list(OrderedDict.fromkeys(sorted_leaves_with_duplicates))
 
         return deduplicated
+
+    def generate_label(self, rank=None):
+        """
+        Generate the label for this node in the graph.
+        :param rank: Optional rank
+        :return: label
+        """
+        rank_label = ""
+        if rank is not None:
+            rank_label = "\nrank:{}".format(rank)
+        penalty_report = ""
+        if self.n_missing_elements > 0:
+            penalty_report += "\nmissing_elements: {}".format(self.n_missing_elements)
+        if self.anisotropy_penalty > 0:
+            penalty_report += "\nnegative anisotropy: {}".format(self.anisotropy_penalty)
+        if len(penalty_report) > 0:
+            penalty_report = "\npenalties" + penalty_report
+        return "r1: {}\nbond: {}\nstochiometry: {}{}\noverall:{}{}".format(
+            self.r1, self.bond_score, self.stoich_score, penalty_report, self.get_score(), rank_label)
 
     def get_best(self, criteria="overall_score"):
         """

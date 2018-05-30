@@ -1,6 +1,12 @@
+from __future__ import absolute_import
 import itertools
 from pymatgen import Element
-from pymatgen.structure_prediction.substitution_probability import SubstitutionProbability
+# try:
+#     from pymatgen.analysis.structure_prediction.substitution_probability import SubstitutionProbability
+# except ImportError:
+#     from pymatgen.structure_prediction.substitution_probability import SubstitutionProbability
+from pymatgen.analysis.structure_prediction.substitution_probability import SubstitutionProbability
+
 from citrination_client import CitrinationClient
 from crystal_refinement.utils.bond_utils import Bond
 
@@ -110,7 +116,7 @@ class OptimizerCache:
             candidate = [{"Element 1": el1, "Element 2": el2, "formula": formula},
                          {"Element 1": el2, "Element 2": el1, "formula": formula}]
 
-            results = [x["Bond length"] for x in self.ml_model.predict(view_id, candidate)["candidates"]]
+            results = [x.get_value("Bond length") for x in self.ml_model.models.predict(view_id, candidate)["candidates"]]
 
             # Only use the prediction if the uncertainty is low enough
             if results[0][1] < 0.5 or results[1][1] < 0.5:

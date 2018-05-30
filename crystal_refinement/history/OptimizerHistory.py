@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from crystal_refinement.history.OptimizerIteration import OptimizerIteration
 from crystal_refinement.utils.bond_utils import get_bonds
 

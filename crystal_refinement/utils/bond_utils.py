@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import re, copy
 from collections import defaultdict
 from pymatgen.io.cif import CifParser

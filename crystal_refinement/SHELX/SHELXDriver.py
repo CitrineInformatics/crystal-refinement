@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import os
 import subprocess
 
@@ -8,9 +9,9 @@ class SHELXDriver:
     """
     Interface that takes SHELXFile objects and does SHELX things (runs xl, xs, reads in and writes out files)
     """
-    def __init__(self, ins_path, prefix, path_to_xl, path_to_xs, use_wine=False, suppress_ouput=True):
+    def __init__(self, directory, prefix, path_to_xl, path_to_xs, use_wine=False, suppress_ouput=True):
         """
-        :param ins_path: Path to initial ins file (output of xprep)
+        :param directory: Path to initial ins file (output of xprep)
         :param prefix: Prefix of initial ins file
         :param path_to_SXTL_dir: Path to the directory where xl and xs executables are
         :param use_wine: Set this flag to true if running windows executables using wine on a mac.
@@ -18,7 +19,7 @@ class SHELXDriver:
         self.use_wine = use_wine
         self.path_to_xl = path_to_xl
         self.path_to_xs = path_to_xs
-        self.directory = ins_path
+        self.directory = directory
         self.file_prefix = prefix
         self.hkl_file = os.path.join(self.directory, prefix + ".hkl")
         self.ins_file = os.path.join(self.directory, prefix + ".ins")

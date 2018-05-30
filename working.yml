@@ -1,0 +1,4 @@
+# SHELX Config
+path_to_xl: /Users/eantono/Documents/program_files/xtal_refinement/SXTL/xl.exe
+path_to_xs: /Users/eantono/Documents/program_files/xtal_refinement/SXTL/xs.exe
+use_wine: true

@@ -1,6 +1,7 @@
+from __future__ import absolute_import
 import re
 import numpy as np
-import crystal_refinement.utils.bond_utils as bond_utils
+import crystal_refinement.utils as bond_utils
 
 
 def identify_sites(initial, optimizer):

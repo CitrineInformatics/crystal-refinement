@@ -1,22 +1,43 @@
-import os
-import shutil
+from __future__ import absolute_import
+import os, shutil, re, ast
 
-from OptimizerSteps import *
+import crystal_refinement.OptimizerSteps as OptimizerSteps
 from crystal_refinement.SHELX.SHELXDriver import SHELXDriver
 from crystal_refinement.history.OptimizerHistory import OptimizerHistory
 from crystal_refinement.utils.OptimizerCache import OptimizerCache
+from argparse import ArgumentParser
+
+try:
+    import configparser
+except ImportError:
+    import ConfigParser as configparser
 
 
 class Optimizer:
     """
     Class for performing single crystal refinement
     """
-    def __init__(self, path_to_xl, path_to_xs, path_to_ins, input_prefix, output_prefix, use_wine=False,
-                 bond_lengths=None, mixing_pairs=None, use_ml_model=False, citrination_api_key=None,
+
+    def __init__(self,
+                 input_prefix,
+                 output_prefix,
+                 input_directory,
+                 path_to_xl,
+                 path_to_xs,
+                 use_wine=False,
+                 bond_lengths=None,
+                 mixing_pairs=None,
+                 use_ml_model=False,
+                 citrination_api_key=None,
                  ensure_identified_elements=True,
-                 r1_similarity_threshold=0.0075, occupancy_threshold=0.02, r1_threshold=0.1,
+                 r1_similarity_threshold=0.0075,
+                 occupancy_threshold=0.02,
+                 r1_threshold=0.1,
                  overall_score_ratio_threshold=1.3,
-                 score_weighting=1.0, max_n_leaves=50, least_squares_iterations=4, n_results=10, suppress_output=True,
+                 score_weighting=1.0,
+                 max_n_leaves=50,
+                 n_results=10,
+                 suppress_output=True,
                  log_output=False):
         """
         :param path_to_xl: path to xl executable (including executable file name)
@@ -61,7 +82,7 @@ class Optimizer:
         # Initialize parameters based on arguments
         self.path_to_xl = path_to_xl
         self.path_to_xs = path_to_xs
-        self.path_to_ins = path_to_ins
+        self.input_directory = os.path.abspath(input_directory)
         self.input_prefix = input_prefix
         self.output_prefix = output_prefix
         self.use_wine = use_wine
@@ -74,7 +95,6 @@ class Optimizer:
         self.r1_similarity_threshold = r1_similarity_threshold
         self.r1_threshold = r1_threshold
         self.occupancy_threshold = occupancy_threshold
-        self.least_squares_iterations = least_squares_iterations
         self.score_weighting = score_weighting
         self.max_n_leaves = max_n_leaves
         self.n_results = n_results
@@ -83,7 +103,7 @@ class Optimizer:
         self.validate_inputs()
 
         # Initialize objects to be used during run()
-        self.driver = SHELXDriver(ins_path=self.path_to_ins, prefix=self.output_prefix, path_to_xl=self.path_to_xl,
+        self.driver = SHELXDriver(directory=self.input_directory, prefix=self.output_prefix, path_to_xl=self.path_to_xl,
                                   path_to_xs=self.path_to_xs, use_wine=self.use_wine, suppress_ouput=suppress_output)
         self.history = None
         self.cache = None
@@ -96,16 +116,20 @@ class Optimizer:
         """
 
         # Copy ins and hkl file to output prefix
-        os.chdir(self.path_to_ins)
-        shutil.copy(os.path.join(self.path_to_ins, self.input_prefix + ".hkl"), os.path.join(self.path_to_ins, self.output_prefix + ".hkl"))
-        shutil.copy(os.path.join(self.path_to_ins, self.input_prefix + ".ins"), os.path.join(self.path_to_ins, self.output_prefix + ".ins"))
+        # os.chdir(self.input_directory)
+
+        shutil.copy(os.path.join(self.input_directory, self.input_prefix + ".hkl"),
+                    os.path.join(self.input_directory, self.output_prefix + ".hkl"))
+        shutil.copy(os.path.join(self.input_directory, self.input_prefix + ".ins"),
+                    os.path.join(self.input_directory, self.output_prefix + ".ins"))
 
         # Check that the ins file is direct from xprep, without having been run before
         # f = open(self.output_prefix + ".ins")
 
         # Run first iteration using xs
         self.driver.run_SHELXTL_command(cmd="xs")
-        shutil.copy(os.path.join(self.path_to_ins, self.output_prefix + ".res"), os.path.join(self.path_to_ins, self.output_prefix + ".ins"))
+        shutil.copy(os.path.join(self.input_directory, self.output_prefix + ".res"),
+                    os.path.join(self.input_directory, self.output_prefix + ".ins"))
 
         # Read in and run initial SHELXTL file
         ins_file = self.driver.get_ins_file()
@@ -113,7 +137,7 @@ class Optimizer:
             print("Initial INS file:")
             print(ins_file.to_string())
         ins_file.remove_command('L.S.')
-        ins_file.add_command('L.S.', [str(self.least_squares_iterations)])
+        ins_file.add_command('L.S.', ["4"])
         self.cache = OptimizerCache(ins_file,
                                     self.bond_lengths,
                                     self.mixing_pairs,
@@ -123,30 +147,31 @@ class Optimizer:
         self.history = OptimizerHistory(self.driver, self.cache, ins_file, self.score_weighting, self.max_n_leaves)
 
         # Optimization
-        self.run_step(identify_sites)
-        self.run_step(switch_elements)
+        self.run_step(OptimizerSteps.identify_sites)
+        self.run_step(OptimizerSteps.switch_elements)
         self.history.clean_history()
-        self.run_step(change_occupancy)
-        self.run_step(try_exti)
-        self.run_step(try_anisotropy)
+        self.run_step(OptimizerSteps.change_occupancy)
+        self.run_step(OptimizerSteps.try_exti)
+        self.run_step(OptimizerSteps.try_anisotropy)
         pre_weight_leaves = self.history.get_leaves()
-        self.run_step(use_suggested_weights)
-        self.run_step(use_suggested_weights)
+        self.run_step(OptimizerSteps.use_suggested_weights)
+        self.run_step(OptimizerSteps.use_suggested_weights)
 
         for pre_weight_leaf in pre_weight_leaves:
             self.history.clean_history(1, pre_weight_leaf)
 
-        self.run_step(try_site_mixing)
+        self.run_step(OptimizerSteps.try_site_mixing)
         self.history.clean_history(criteria=["overall_score", "r1_only"])
 
         self.driver.run_SHELXTL(self.history.get_best_history()[-1].ins_file)
         print("Done with optimization")
-        results_path = os.path.join(self.path_to_ins, "optimizer_results")
+        results_path = os.path.join(self.input_directory, "optimizer_results")
         if not os.path.exists(results_path):
             os.mkdir(results_path)
         with open(os.path.join(results_path, "report.txt"), 'w') as f:
             if self.history.head.r1 > 0.1:
-                f.write("WARN: High initial R1 score, there may be something wrong with the assignment of sites to electron density peaks\n")
+                f.write(
+                    "WARN: High initial R1 score, there may be something wrong with the assignment of sites to electron density peaks\n")
             if self.history.get_best_history()[-1].r1 > 0.1:
                 f.write("WARN: High final R1 score, the optimization may not have been successful\n")
             f.write(self.cache.get_report())
@@ -220,14 +245,6 @@ class Optimizer:
         assert 0 <= self.occupancy_threshold <= 1.0, "occupancy_threshold should be a real number between 0.0 and 1.0"
 
         try:
-            int(self.least_squares_iterations)
-        except ValueError:
-            print("least_squares_iterations should be numerical")
-        assert 0 < self.least_squares_iterations, "least_squares_iterations should be a positive integer"
-        assert int(self.least_squares_iterations) == self.least_squares_iterations, \
-            "least_squares_iterations should be a positive integer"
-
-        try:
             float(self.score_weighting)
         except ValueError:
             print("score_weighting should be numerical")
@@ -248,4 +265,116 @@ class Optimizer:
         assert int(self.n_results) == self.n_results, "n_results should be a positive integer"
 
 
+if __name__ == "__main__":
+    """
+    Command line interface for the optimizer
+    """
+    arg_parser = ArgumentParser()
 
+    # arg_parser.add_argument("-d", "--directory",
+    #                         help="Path to the directory containing the initial ins file, without filename, "
+    #                              "e.g. /path/to/file/", dest="directory")
+    # arg_parser.add_argument("-i", "--input", dest="input_prefix",
+    #                         help="Prefix for input file. e.g. if input file is input.ins, then the prefix is 'input'")
+    # arg_parser.add_argument("-o", "--output", dest="output_prefix",
+    #                         help="Prefix for output file. This is where result of optimization will be written")
+    # arg_parser.add_argument("-c", "--config", dest="config_file",
+    #                         help="Configuration file specifying additional parameters for the optimizer")
+
+    arg_parser.add_argument("directory", help="Path to the directory containing the initial ins file, without filename,"
+                                              " e.g. /path/to/file/")
+    arg_parser.add_argument("input_prefix", help="Prefix for input file. e.g. if input file is input.ins, then the "
+                                                 "prefix is 'input'")
+    arg_parser.add_argument("output_prefix", help="Prefix for output file. This is where result of optimization will "
+                                                  "be written")
+    arg_parser.add_argument("config_file", help="Configuration file specifying additional parameters for the optimizer")
+
+    args = arg_parser.parse_args()
+    input_directory = args.directory
+    input_prefix = args.input_prefix
+    output_prefix = args.output_prefix
+
+    config_parser = configparser.ConfigParser()
+    config_parser.read(args.config_file)
+
+    # SHELX Config section
+    xl_path = config_parser.get("SHELX Config", "path_to_xl")
+    xs_path = config_parser.get("SHELX Config", "path_to_xs")
+    use_wine = config_parser.getboolean("SHELX Config", "use_wine", fallback=False)
+
+    # Optimizer Config section
+    r1_threshold = config_parser.getfloat("Optimizer config", "r1_threshold", fallback=0.1)
+    r1_similarity_threshold = config_parser.getfloat("Optimizer config", "r1_similarity_threshold", fallback=0.0075)
+    overall_score_ratio_threshold = config_parser.getfloat("Optimizer config", "overall_score_ratio_threshold",
+                                                           fallback=1.3)
+    occupancy_threshold = config_parser.getfloat("Optimizer config", "occupancy_threshold", fallback=0.02)
+    max_n_leaves = config_parser.getfloat("Optimizer config", "max_n_leaves", fallback=50)
+
+    # Bond Length Config section
+    bond_lengths = config_parser.get("Bond Length Config", "bond_lengths", fallback=None)
+    if bond_lengths is not None:
+        bond_length_assert_message = "{} is an invalid configuration for bond_lengths. Please enter a list of tuples " \
+                                     "in the form [('Ge', 'Mn', 2.5)]".format(bond_lengths)
+        try:
+            bond_lengths = ast.literal_eval(bond_lengths)
+            assert type(bond_lengths) == list, bond_length_assert_message
+            for bond in bond_lengths:
+                assert type(bond) == tuple \
+                       and len(bond) == 3 \
+                       and type(bond[0]) == str \
+                       and type(bond[1]) == str \
+                       and type(bond[2]) == float, bond_length_assert_message
+
+        except ValueError:
+            assert False, bond_length_assert_message
+    use_ml_model = config_parser.getboolean("Bond Length Config", "use_ml_model", fallback=False)
+    citrination_api_key = config_parser.get("Bond Length Config", "citrination_api_key", fallback=None)
+
+    # Mixing Pairs Config section
+    mixing_pairs = config_parser.get("Mixing Pairs Config", "mixing_pairs", fallback=None)
+    if mixing_pairs is not None:
+        mixing_pairs_assert_message = "{} is an invalid configuration for bond_lengths. Please enter a list of tuples " \
+                                      "in the form [('Au', 'Os')]".format(bond_lengths)
+        try:
+            mixing_pairs = ast.literal_eval(mixing_pairs)
+            assert type(mixing_pairs) == list, mixing_pairs_assert_message
+            for mixing_pair in mixing_pairs:
+                assert type(mixing_pair) == tuple \
+                       and len(mixing_pair) == 2 \
+                       and type(mixing_pair[0]) == str \
+                       and type(mixing_pair[1]) == str, mixing_pairs_assert_message
+
+        except ValueError:
+            assert False, mixing_pairs_assert_message
+
+    # Score Config section
+    score_weighting = config_parser.getfloat("Score Config", "score_weighting", fallback=1.0)
+    ensure_identified_elements = config_parser.getboolean("Score Config", "ensure_identified_elements", fallback=True)
+
+    # Logging Config section
+    n_results = config_parser.getint("Logging Config", "n_results", fallback=10)
+    suppress_output = config_parser.getboolean("Logging Config", "suppress_output", fallback=True)
+    log_output = config_parser.getboolean("Logging Config", "log_output", fallback=False)
+
+    # Create optimizer object and run on example
+    opt = Optimizer(input_prefix=input_prefix,
+                    output_prefix=output_prefix,
+                    input_directory=input_directory,
+                    path_to_xl=xl_path,
+                    path_to_xs=xs_path,
+                    use_wine=use_wine,
+                    bond_lengths=bond_lengths,
+                    mixing_pairs=mixing_pairs,
+                    use_ml_model=use_ml_model,
+                    citrination_api_key=citrination_api_key,
+                    ensure_identified_elements=ensure_identified_elements,
+                    r1_similarity_threshold=r1_similarity_threshold,
+                    occupancy_threshold=occupancy_threshold,
+                    r1_threshold=r1_threshold,
+                    overall_score_ratio_threshold=overall_score_ratio_threshold,
+                    score_weighting=score_weighting,
+                    max_n_leaves=max_n_leaves,
+                    n_results=n_results,
+                    suppress_output=suppress_output,
+                    log_output=log_output)
+    opt.run()
