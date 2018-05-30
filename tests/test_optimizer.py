@@ -4,6 +4,7 @@ import shutil
 import time
 
 from crystal_refinement.Optimizer import Optimizer
+from crystal_refinement.utils import bond_utils
 
 
 def test_all(path_to_SXTL_dir, ins_folder, input_prefix="absfac1", output_prefix="temp", use_wine=False, print_files=False,
@@ -78,7 +79,7 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
                 open(os.path.join(dirname, "1.ins"))
                 final_res = os.path.join(dirname, "result.res")
                 open(final_res)
-            except Exception, e:
+            except Exception as e:
                 print("File structure failure", e)
                 print("~" * 50)
                 return
@@ -101,7 +102,7 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
     anton_res_nsites, anton_res_el_lines, anton_el = test_result(open(final_res).read())
     opt_res_nsites = opt_res.get_n_sites()
     opt_res_el = sorted([site.element for site in opt_res.get_all_sites()])
-    print(len(opt.history.leaves), "path(s) tried")
+    print(len(opt.history.get_leaves()), "path(s) tried")
     print("Initial r1 = {}".format(best_history[0].r1))
     print("Optimizer r1 = {}".format(best_history[-1].r1))
     print("Reference r1 = {}".format(anton_r1))
@@ -118,11 +119,11 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
         print(line)
     print("Optimizer sites:")
     print(best_history[-1].res_file.crystal_sites_string())
-    bond_lengths = opt.utils.get_bonds(opt.driver, opt_res)
-    bonds_by_site = opt.utils.get_nn_bonds_by_site(bond_lengths, opt_res)
+    bond_lengths = bond_utils.get_bonds(opt.driver, opt_res)
+    bonds_by_site = bond_utils.get_nn_bonds_by_site(bond_lengths, opt_res)
     print("Final bond lengths:")
     for x in bonds_by_site.values():
-        print x
+        print(x)
     print("Runtime = {}s".format(runtime))
     if best_history[-1].r1 - anton_r1 > r1_tol:
         print("Not success!")
@@ -136,10 +137,19 @@ def test_single(path_to_SXTL_dir, dirname, input_prefix="absfac1", output_prefix
 
 def run_single(path_to_SXTL_dir, ins_path, input_prefix="absfac1", output_prefix="temp", use_wine=False,
                generate_graph=False, truncated_graph=False, graph_path="", graph_name="out"):
-    opt = Optimizer(os.path.join(path_to_SXTL_dir, "xl.exe"), os.path.join(path_to_SXTL_dir, "xs.exe"), ins_path, input_prefix,
-            output_prefix, use_wine=use_wine, n_results=5, max_n_leaves=20,
-                    score_weighting=0.5, log_output=False, ensure_identified_elements=False,
+    opt = Optimizer(path_to_xl=os.path.join(path_to_SXTL_dir, "xl.exe"),
+                    path_to_xs=os.path.join(path_to_SXTL_dir, "xs.exe"),
+                    input_directory=ins_path,
+                    input_prefix=input_prefix,
+                    output_prefix=output_prefix,
+                    use_wine=use_wine,
+                    n_results=5,
+                    max_n_leaves=20,
+                    score_weighting=0.5,
+                    log_output=False,
+                    ensure_identified_elements=False,
                     use_ml_model=True,
+                    citrination_api_key=os.environ["CITRINATION_API_KEY"],
                     # bond_lengths=[("Ge", "Mn", 2.5)]
                     mixing_pairs=[("Os", "Au")]
                     # mixing_pairs = [("Ga", "Ge")]
@@ -209,22 +219,23 @@ def ins_from_result(folder_path, result_file="result.res", input_prefix="1"):
 
 def main():
     path_to_SXTL_dir = "/Users/eantono/Documents/program_files/xtal_refinement/SXTL/"
-    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/4-2-1-4 INS and HKL files"
-    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/!UNSEEN 4-2-1-4/"
-    ins_folders = ["4-2-1-4_single_crystal", "4-2-1-4 INS and HKL files", "!UNSEEN 4-2-1-4", "Organized_data1/EASY",
-                   "Organized_data1/MIXING", "Organized_data2/EASY", "Organized_data2/Partial occupancy",
-                   "Organized_data2/mixing"]
-    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data1/EASY"
-    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data1/MIXING"
-    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data2/EASY"
-    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data2/Partial occupancy"
-    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/Organized_data2/mixing"
-    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/testing_021618_B/worse"
-    # ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/testing_021618_A"
-    ins_folder = "/Users/eantono/Documents/project_files/xtal_refinement/testing_031418_mlmodel/look into/S or Se"
-    # subdir = "mar12d7_Rb4Mn35Zn35Sb7"
+    # ins_folders = ["4-2-1-4_single_crystal", "4-2-1-4 INS and HKL files", "!UNSEEN 4-2-1-4", "Organized_data1/EASY",
+    #                "Organized_data1/MIXING", "Organized_data2/EASY", "Organized_data2/Partial occupancy",
+    #                "Organized_data2/mixing"]
+    # ins_folder = "/Users/eantono/Documents/project_files [C_CITRINE]/xtal_refinement/Organized_data1/EASY"
+    # ins_folder = "/Users/eantono/Documents/project_files [C_CITRINE]/xtal_refinement/Organized_data1/MIXING"
+    # ins_folder = "/Users/eantono/Documents/project_files [C_CITRINE]/xtal_refinement/Organized_data2/EASY"
+    # ins_folder = "/Users/eantono/Documents/project_files [C_CITRINE]/xtal_refinement/Organized_data2/Partial occupancy"
+    # ins_folder = "/Users/eantono/Documents/project_files [C_CITRINE]/xtal_refinement/Organized_data2/mixing"
+    # ins_folder = "/Users/eantono/Documents/project_files [C_CITRINE]/xtal_refinement/4-2-1-4 INS and HKL files"
+    # ins_folder = "/Users/eantono/Documents/project_files [C_CITRINE]/xtal_refinement/!UNSEEN 4-2-1-4/"
+    ins_folder = "/Users/eantono/Documents/project_files [C_CITRINE]/xtal_refinement/paper examples/"
+
+    # ins_folder = "/Users/eantono/Documents/project_files [C_CITRINE]/xtal_refinement/testing_021618_B/worse"
+    # ins_folder = "/Users/eantono/Documents/project_files [C_CITRINE]/xtal_refinement/testing_021618_A"
+    # ins_folder = "/Users/eantono/Documents/project_files [C_CITRINE]/xtal_refinement/testing_031418_mlmodel/look into/S or Se"
     subdirs = ["mixing"]
-    # subdirs = ["mar1552-BaLa2In2S7", "mar1556-BaPr2In2S7", "mar1561-BaLa2In2Se7", "mar1562-BaNd2In2Se7"]
+    subdir = "bond length"
 
     graph_output_path = "/Users/eantono/Documents/src/xtal_refinement/output"
     # path_to_SXTL_dir = "/Users/julialing/Documents/GitHub/crystal_refinement/shelxtl/SXTL/"
@@ -240,34 +251,34 @@ def main():
     #     ins_folder = os.path.join("/Users/eantono/Documents/project_files/xtal_refinement", subdir)
     #     test_all(path_to_SXTL_dir, ins_folder, input_prefix="detect", use_wine=True, print_files=False,
     #              generate_graph=True, truncated_graph=True, graph_path=graph_output_path)
-    test_all(path_to_SXTL_dir, ins_folder, input_prefix="detect", use_wine=True, print_files=False,
-      generate_graph=True, truncated_graph=True, graph_path=graph_output_path)
+    # test_all(path_to_SXTL_dir, ins_folder, input_prefix="detect", use_wine=True, print_files=False,
+    #   generate_graph=True, truncated_graph=True, graph_path=graph_output_path)
     # for subdir in subdirs:
     #     test_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "detect", use_wine=True, print_files=False,
     #       generate_graph=True, truncated_graph=False, graph_path=graph_output_path, result_filename=None)
 
     # run_all(path_to_SXTL_dir, ins_folder, input_prefix="1", use_wine=True,
     #   generate_graph=True, graph_path=graph_output_path)
-    # opt = run_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "input", use_wine=True,
-      # generate_graph=True, graph_path=graph_output_path)
-    # best_history = opt.history.get_best_history()
-    # opt_res = best_history[-1].ins_file
-    # nominal_formula = opt_res.get_nominal_formula()
-    # result_formula = opt_res.get_analytic_formula()
-    # nsites = best_history[-1].res_file.get_n_sites()
-    # bond_lengths = opt.utils.get_bonds(opt.driver, opt_res)
-    # bonds_by_site = opt.utils.get_nn_bonds_by_site(bond_lengths, opt_res)
-    # for x in bonds_by_site.values():
-    #     print x
-    # print(nominal_formula)
-    # print(result_formula)
-    # print(nsites)
+    opt = run_single(path_to_SXTL_dir, os.path.join(ins_folder, subdir), "input", use_wine=True,
+      generate_graph=True, graph_path=graph_output_path)
+    best_history = opt.history.get_best_history()
+    opt_res = best_history[-1].ins_file
+    nominal_formula = opt_res.get_nominal_formula()
+    result_formula = opt_res.get_analytic_formula()
+    nsites = best_history[-1].res_file.get_n_sites()
+    bond_lengths = bond_utils.get_bonds(opt.driver, opt_res)
+    bonds_by_site = bond_utils.get_nn_bonds_by_site(bond_lengths, opt_res)
+    for x in bonds_by_site.values():
+        print(x)
+    print(nominal_formula)
+    print(result_formula)
+    print(nsites)
     # sorted_results = opt.history.head.get_sorted_leaves(criteria=["overall_score", "r1_only"])
     # for i in range(5):
     #     print (i)
     #     opt_res = sorted_results[i].res_file
-    #     bond_lengths = opt.utils.get_bonds(opt.driver, opt_res)
-    #     score = opt.utils.score_compound_bonds_relative_distance(bond_lengths, opt_res, opt.driver, True)
+    #     bond_lengths = bond_utils.get_bonds(opt.driver, opt_res)
+    #     score = .g get_bond_score(bond_lengths, opt_res, opt.driver, True)
     #     print("bond score:")
     #     print(score)
 
