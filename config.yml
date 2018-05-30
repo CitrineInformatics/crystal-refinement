@@ -1,0 +1,28 @@
+# SHELX Config
+path_to_xl: path/to/xl.exe
+path_to_xs: path/to/xs.exe
+use_wine: false
+
+# Optimizer Config
+r1_threshold: 0.1
+r1_similarity_threshold: 0.0075
+overall_score_ratio_threshold: 1.3
+occupancy_threshold: 0.02
+max_n_leaves: 50
+
+# Bond Length Config
+#bond_lengths: [("Ge", "Mn", 2.5)]
+use_ml_model: false
+citrination_api_key: YOUR_CITRINATION_API_KEY
+
+# Mixing Pairs Config
+#mixing_pairs: [("Au", "Os")]
+
+# Score Config
+score_weighting: 1.0
+ensure_identified_elements: True
+
+# Logging Config
+n_results: 10
+suppress_output: True
+log_output: False
