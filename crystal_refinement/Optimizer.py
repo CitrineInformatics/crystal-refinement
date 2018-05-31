@@ -34,7 +34,7 @@ class Optimizer:
                  occupancy_threshold=0.02,
                  r1_threshold=0.1,
                  overall_score_ratio_threshold=1.3,
-                 score_weighting=1.0,
+                 score_weighting=0.5,
                  max_n_leaves=50,
                  n_results=10,
                  suppress_output=True,
@@ -42,7 +42,7 @@ class Optimizer:
         """
         :param path_to_xl: path to xl executable (including executable file name)
         :param path_to_xs: path to xs executable (including executable file name)
-        :param path_to_ins: path to directory containing *.ins file output by xprep (not including *.ins file name)
+        :param input_directory: path to directory containing *.ins file output by xprep (not including *.ins file name)
         :param input_prefix: prefix of ins file (e.g. for file.ins, the prefix would be "file")
         :param output_prefix: prefix of the result file that the optimizer will output
         :param use_wine: In order to run Windows executables on a mac, the wine app can be used.
@@ -52,31 +52,30 @@ class Optimizer:
         :param mixing_pairs: A list of acceptable elements to allow to co-occupy a site. (e.g. [('Ge', 'Ru')])
             If no such list is provided, then acceptable mixing pairs are determined based on pymatgen information.
         :param use_ml_model: Whether to use the bond length machine learning model to estimate bond lengths.
-            If True, a machine learning model hosted at citrination.com is queried to determine the bond lengths.
-                Using this option requires obtaining a free Citrination user account and setting the CITRINATION_API_KEY
-                environment variable with your account API key.
+            If True, a machine learning model hosted at https://citrination.com is queried to determine the bond lengths.
                 If this machine learning model has high uncertainty for the bond lengths queried, the optimizer defaults
                 back to the atomic radii model.
             If False, a simpler bond length model based on atomic radii is used.
-        :param r1_similarity_threshold: If r1 scores for multiple options are within this similarity threshold, the
-            optimizer will branch and explore all the options.  (Should be doulbe in range (0.0, 1.0)).
+        :param citrination_api_key: API key in order to use the Citrination bond length model. This can be found at
+            https://citrination.com/users/edit
+        :param ensure_identified_elements: Whether to penalize the score a result if any elements identified in the
+            initial .ins file are not present.
+        :param r1_similarity_threshold: Difference threshold for r1 scores to allow for branching.  (Should be double
+            in range (0.0, 1.0)).
         :param occupancy_threshold: Minimum deviation in occupancy or site mixing to trigger partial occupancy
             (Should be double in range (0.0, 1.0)).
         :param r1_threshold: Threshold to denote a high r1 score, which triggers an alternate path in the optimizer
-            where bond lengths drive the optimization instead of r1 (Should be a double in range (0.0, 1.0)).
+            where bond lengths drive the assignment of sites instead of the r1 score (Should be a double in range (0.0, 1.0)).
         :param overall_score_ratio_threshold: Ratio threshold for overall score similarity to allow for branching
-        :param score_weighting: Weighting of R1 score versus bond length score when choosing optimal path.
+        :param score_weighting: Weighting of R1 score versus bond length score when calculating the overall score.
             A value of 1.0 corresponds to R1 only.  (Should be a double in range (0.0, 1.0)).
-            Recommended range is (0.8, 1.0)).
         :param max_n_leaves: Maximum number of optimization paths to follow at any given optimization step.
             A higher value may give a more optimal path, but will be more computationally expensive.
             (Should be positive integer).
-        :param least_squares_iterations: Number of least squares iterations for xl to use
-            (Should be a positive integer).
         :param n_results: Number of final .res files to save.  For n_results=1, only the results file with the
             best final score (based on R1 and bond lengths) will be saved.  (Should be a non-negative integer).
         :param suppress_output: Whether to suppress the output of the SHELXTL commands
-        :param log_output: Whether to print the optimizer logs
+        :param log_output: Whether to print the logs during the optimization process
         """
 
         # Initialize parameters based on arguments

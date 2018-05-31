@@ -4,29 +4,7 @@ import yaml, ast
 from argparse import ArgumentParser
 from crystal_refinement.Optimizer import Optimizer
 
-
-def main():
-    """
-    Command line interface for the optimizer
-    """
-    arg_parser = ArgumentParser()
-
-    arg_parser.add_argument("-d", "--directory",
-                            help="Path to the directory containing the initial ins file, without filename, "
-                                 "e.g. /path/to/file/", dest="directory")
-    arg_parser.add_argument("-i", "--input", dest="input_prefix",
-                            help="Prefix for input file. e.g. if input file is input.ins, then the prefix is 'input'")
-    arg_parser.add_argument("-o", "--output", dest="output_prefix",
-                            help="Prefix for output file. This is where result of optimization will be written")
-    arg_parser.add_argument("-c", "--config", dest="config_file",
-                            help="Configuration file specifying additional parameters for the optimizer")
-
-    args = arg_parser.parse_args()
-    input_directory = args.directory
-    input_prefix = args.input_prefix
-    output_prefix = args.output_prefix
-    config_file = args.config_file
-
+def parse_config(config_file):
     with open(config_file) as f:
         config = yaml.load(f)
 
@@ -80,7 +58,7 @@ def main():
                 assert False, mixing_pairs_assert_message
 
         # Score Config section
-        score_weighting = config.get("score_weighting", 1.0)
+        score_weighting = config.get("score_weighting", 0.5)
         ensure_identified_elements = config.get("ensure_identified_elements", True)
 
         # Logging Config section
@@ -88,29 +66,77 @@ def main():
         suppress_output = config.get("suppress_output", True)
         log_output = config.get("log_output", False)
 
-    # Create optimizer object and run on example
-    opt = Optimizer(input_prefix=input_prefix,
-                    output_prefix=output_prefix,
-                    input_directory=input_directory,
-                    path_to_xl=xl_path,
-                    path_to_xs=xs_path,
-                    use_wine=use_wine,
-                    bond_lengths=bond_lengths,
-                    mixing_pairs=mixing_pairs,
-                    use_ml_model=use_ml_model,
-                    citrination_api_key=citrination_api_key,
-                    ensure_identified_elements=ensure_identified_elements,
-                    r1_similarity_threshold=r1_similarity_threshold,
-                    occupancy_threshold=occupancy_threshold,
-                    r1_threshold=r1_threshold,
-                    overall_score_ratio_threshold=overall_score_ratio_threshold,
-                    score_weighting=score_weighting,
-                    max_n_leaves=max_n_leaves,
-                    n_results=n_results,
-                    suppress_output=suppress_output,
-                    log_output=log_output)
-    opt.run()
+        return {
+            "path_to_xl": xl_path,
+            "path_to_xs": xs_path,
+            "use_wine": use_wine,
+            "bond_lengths": bond_lengths,
+            "mixing_pairs": mixing_pairs,
+            "use_ml_model": use_ml_model,
+            "citrination_api_key": citrination_api_key,
+            "ensure_identified_elements": ensure_identified_elements,
+            "r1_similarity_threshold": r1_similarity_threshold,
+            "occupancy_threshold": occupancy_threshold,
+            "r1_threshold": r1_threshold,
+            "overall_score_ratio_threshold": overall_score_ratio_threshold,
+            "score_weighting": score_weighting,
+            "max_n_leaves": max_n_leaves,
+            "n_results": n_results,
+            "suppress_output": suppress_output,
+            "log_output": log_output
+        }
+
+
+def main():
+    """
+    Command line interface for the optimizer
+    """
+    arg_parser = ArgumentParser()
+
+    arg_parser.add_argument("-d", "--directory",
+                            help="Path to the directory containing the initial ins file, without filename, "
+                                 "e.g. /path/to/file/", dest="directory")
+    arg_parser.add_argument("-i", "--input", dest="input_prefix",
+                            help="Prefix for input file. e.g. if input file is input.ins, then the prefix is 'input'")
+    arg_parser.add_argument("-o", "--output", dest="output_prefix",
+                            help="Prefix for output file. This is where result of optimization will be written")
+    arg_parser.add_argument("-c", "--config", dest="config_file",
+                            help="YAML Configuration file specifying additional parameters for the optimizer")
+    arg_parser.add_argument("-p", "--parse", dest="parse", action='store_true',
+                            help="Print the values of the parameters read from the configuration file, including "
+                                 "default values if parameters were not specified in the configuration file.")
+    arg_parser.add_argument("-r", "--run", dest="run", action='store_true', help="Run the optimizer.")
+
+    args = arg_parser.parse_args()
+    if not (args.parse or args.run):
+        print("Must specify either parse (-p) or run (-r).")
+        quit()
+    if args.config_file is None:
+        print("No configuration file was specified")
+        quit()
+
+    config_file = args.config_file
+    config = None
+    if args.parse:
+        config = parse_config(config_file)
+        print("Optimizer configuration")
+        for k, v in sorted(config.items(), key=lambda tup: tup[0]):
+            print("{}={}".format(k, v))
+    if args.run:
+        input_directory = args.directory
+        input_prefix = args.input_prefix
+        output_prefix = args.output_prefix
+        if input_directory is None or input_prefix is None or output_prefix is None:
+            print("Input directory, input prefix and output prefix must all be specified when running the optimizer.")
+            quit()
+        if config is None:
+            config = parse_config(config_file)
+        # Create and run optimizer object
+        opt = Optimizer(input_prefix=input_prefix,
+                        output_prefix=output_prefix,
+                        input_directory=input_directory,
+                        **config)
+        opt.run()
 
 if __name__ == "__main__":
-
     main()
