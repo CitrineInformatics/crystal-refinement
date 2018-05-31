@@ -69,10 +69,3 @@ account on the public Citrination site.
 The optimizer will follow multiple paths to see which path yields the best final fit.  For example, if two different
 elements both yield similar R1 values at a given crystal site, the optimizer will try both options to see which give
 the best final fit.  This results in a branching tree structure.
-
-# List of user-specified bond lengths to use in place of the optimizer-determined bond lengths (using the heuristic or
-# machine learning estimates). Bond lengths not specified in this list will have optimizer-determined bond lengths.
-
-# Full list of all element pairs to be considered for mixing. If the list is empty e.g. [], no mixing will be
-# considered. If the list of mixing pairs is not specified in this config file, the optimizer will automatically
-# determine mixing pairs to be considered.
