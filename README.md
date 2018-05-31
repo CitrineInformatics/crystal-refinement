@@ -28,7 +28,7 @@ python virtual environment (https://virtualenv.pypa.io/en/stable/).
 
 - SHELXTL executables (xl.exe and xs.exe on Windows, shelxl and shelxs on MacOS).
 - In order to use the machine learning model for bond lengths, you will also need to create a free account at
-citrination.com
+https://citrination.com
 - Graphviz to render the optimization graphs: https://graphviz.gitlab.io/download/
 
 # Usage
