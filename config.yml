@@ -1,5 +1,6 @@
-# SHELX Config
-
+################
+# SHELX Config #
+################
 # Path to the SHELX xl executable
 path_to_xl: path/to/xl.exe
 # Path to the SHELX xs executable
@@ -7,7 +8,9 @@ path_to_xs: path/to/xs.exe
 # Whether to use wine to execute the SHELX executables (if you need to run .exe files on a MacOS)
 use_wine: false
 
-# Optimizer Config
+####################
+# Optimizer Config #
+####################
 
 # Threshold to denote a high r1 score, which triggers an alternate path in the optimizer where bond lengths drive the
 # assignment of sites instead of r1 score.
@@ -22,7 +25,9 @@ occupancy_threshold: 0.02
 # optimal path, but will be more computationally expensive.
 max_n_leaves: 50
 
-# Bond Length Config
+######################
+# Bond Length Config #
+######################
 
 # A list of prescribed ideal bond lengths in Angstroms. If a bond length is not specified, then it is calculated via
 # either a machine learning model or based on the atomic radii.
@@ -32,13 +37,17 @@ use_ml_model: false
 # API key in order to use the Citrination bond length model. This can be found at https://citrination.com/users/edit
 citrination_api_key: YOUR_CITRINATION_API_KEY
 
-# Mixing Pairs Config
+#######################
+# Mixing Pairs Config #
+#######################
 
 # A list of acceptable elements to allow to co-occupy a site. If no such list is provided, then acceptable mixing pairs
 # are determined based on pymatgen information.
 mixing_pairs: [("Au", "Os")]
 
-# Score Config
+################
+# Score Config #
+################
 
 # Weighting of R1 score versus bond length score when calculating the overall score. A value of 1.0 corresponds to R1
 # only. This must be a double in range (0.0, 1.0)).
@@ -46,7 +55,9 @@ score_weighting: 0.5
 # Whether to penalize the score a result if any elements identified in the initial .ins file are not present.
 ensure_identified_elements: True
 
-# Logging Config
+##################
+# Logging Config #
+##################
 
 # Number of final .res files to save
 n_results: 10
