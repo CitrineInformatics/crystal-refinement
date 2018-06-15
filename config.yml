@@ -50,7 +50,7 @@ mixing_pairs: [("Au", "Os")]
 ################
 
 # Weighting of R1 score versus bond length score when calculating the overall score. A value of 1.0 corresponds to R1
-# only. This must be a double in range (0.0, 1.0)).
+# only, a value of 0.0 corresponds to bond length score only. This must be a double in range (0.0, 1.0)).
 score_weighting: 0.5
 # Whether to penalize the score a result if any elements identified in the initial .ins file are not present.
 ensure_identified_elements: True
