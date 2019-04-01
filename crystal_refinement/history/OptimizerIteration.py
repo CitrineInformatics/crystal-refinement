@@ -317,8 +317,6 @@ class OptimizerIteration:
             penalty_report += "\nmissing_elements: {}".format(self.n_missing_elements)
         if self.anisotropy_penalty > 0:
             penalty_report += "\nnegative anisotropy: {}".format(self.anisotropy_penalty)
-        if len(penalty_report) > 0:
-            penalty_report = "\npenalties" + penalty_report
         return "r1: {}\nbond: {}\nstochiometry: {}{}\noverall:{}{}".format(
             self.r1, self.bond_score, self.stoich_score, penalty_report, self.get_score(), rank_label)
 

@@ -1,5 +1,5 @@
 crystal_refinement
-numpy
+numpy>=1.14.3
 pymatgen<2017.9.1
 citrination-client>=4.0.0
 graphviz
