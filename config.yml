@@ -11,7 +11,6 @@ use_wine: false
 ####################
 # Optimizer Config #
 ####################
-
 # Threshold to denote a high r1 score, which triggers an alternate path in the optimizer where bond lengths drive the
 # assignment of sites instead of r1 score.
 r1_threshold: 0.1
@@ -28,7 +27,6 @@ max_n_leaves: 50
 ######################
 # Bond Length Config #
 ######################
-
 # A list of prescribed ideal bond lengths in Angstroms. If a bond length is not specified, then it is calculated via
 # either a machine learning model or based on the atomic radii.
 bond_lengths: [("Ge", "Mn", 2.5)]
@@ -40,15 +38,13 @@ citrination_api_key: YOUR_CITRINATION_API_KEY
 #######################
 # Mixing Pairs Config #
 #######################
-
 # A list of acceptable elements to allow to co-occupy a site. If no such list is provided, then acceptable mixing pairs
 # are determined based on pymatgen information.
-mixing_pairs: [("Au", "Os")]
+mixing_pairs: "[('Au', 'Os')]"
 
 ################
 # Score Config #
 ################
-
 # Weighting of R1 score versus bond length score when calculating the overall score. A value of 1.0 corresponds to R1
 # only. This must be a double in range (0.0, 1.0)).
 score_weighting: 0.5
@@ -58,7 +54,6 @@ ensure_identified_elements: True
 ##################
 # Logging Config #
 ##################
-
 # Number of final .res files to save
 n_results: 10
 # Whether to suppress the output of the SHELXTL commands

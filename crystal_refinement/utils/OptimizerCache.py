@@ -1,11 +1,11 @@
 from __future__ import absolute_import
 import itertools
 from pymatgen import Element
-# try:
-#     from pymatgen.analysis.structure_prediction.substitution_probability import SubstitutionProbability
-# except ImportError:
-#     from pymatgen.structure_prediction.substitution_probability import SubstitutionProbability
-from pymatgen.structure_prediction.substitution_probability import SubstitutionProbability
+try:
+    from pymatgen.analysis.structure_prediction.substitution_probability import SubstitutionProbability
+except ImportError:
+    from pymatgen.structure_prediction.substitution_probability import SubstitutionProbability
+# from pymatgen.structure_prediction.substitution_probability import SubstitutionProbability
 
 from citrination_client import CitrinationClient
 from crystal_refinement.utils.bond_utils import Bond

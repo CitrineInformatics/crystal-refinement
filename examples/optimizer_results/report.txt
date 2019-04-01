@@ -1,0 +1,14 @@
+Mixing pairs considered: 
+
+Bond lengths as calculated based on atomic radii:
+Bond: Ge-Ge, length: 2.500 ang
+Bond: Ge-In, length: 2.800 ang
+Bond: Ge-Rh, length: 2.600 ang
+Bond: Ge-Sm, length: 3.100 ang
+Bond: In-In, length: 3.100 ang
+Bond: In-Rh, length: 2.900 ang
+Bond: In-Sm, length: 3.400 ang
+Bond: Rh-Rh, length: 2.700 ang
+Bond: Rh-Sm, length: 3.200 ang
+Bond: Sm-Sm, length: 3.700 ang
+
